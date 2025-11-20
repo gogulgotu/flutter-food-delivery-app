@@ -1,0 +1,1185 @@
+openapi: 3.0.3
+info:
+  title: Hotel Management System API
+  description: |
+    Comprehensive REST API for Hotel Management System built with Django REST Framework.
+    
+    This API provides endpoints for:
+    - User authentication and management
+    - Vendor (restaurant/hotel) management
+    - Product catalog management
+    - Order processing and tracking
+    - Payment processing with Paytm
+    - Delivery management
+    - Real-time notifications
+    
+    ## Authentication
+    The API uses JWT (JSON Web Tokens) for authentication. Include the token in the Authorization header:
+    ```
+    Authorization: Bearer <access_token>
+    ```
+    
+    ## Base URL
+    - Development: `http://localhost:8000/api`
+    - Production: `https://your-domain.com/api`
+    
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@example.com
+
+servers:
+  - url: http://localhost:8000/api
+    description: Development server
+  - url: https://your-domain.com/api
+    description: Production server
+
+tags:
+  - name: Authentication
+    description: User authentication and registration
+  - name: Users
+    description: User profile management
+  - name: Addresses
+    description: Delivery address management
+  - name: Vendors
+    description: Restaurant/vendor information
+  - name: Products
+    description: Product catalog
+  - name: Cart
+    description: Shopping cart management
+  - name: Orders
+    description: Order management
+  - name: Payments
+    description: Payment processing
+  - name: Wallet
+    description: Digital wallet
+  - name: Notifications
+    description: User notifications
+  - name: Delivery
+    description: Delivery person operations
+  - name: Dashboard
+    description: Hotel owner dashboard
+
+paths:
+  /auth/register/:
+    post:
+      tags: [Authentication]
+      summary: Register a new user
+      description: Register a new user account. OTP verification may be required.
+      operationId: registerUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, first_name, last_name]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+                password:
+                  type: string
+                  format: password
+                  minLength: 8
+                  example: SecurePassword123!
+                first_name:
+                  type: string
+                  example: John
+                last_name:
+                  type: string
+                  example: Doe
+                phone_number:
+                  type: string
+                  example: +919876543210
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/User'
+                  requires_otp_verification:
+                    type: boolean
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /auth/login/:
+    post:
+      tags: [Authentication]
+      summary: Login with email and password
+      description: Authenticate user and receive JWT tokens
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access:
+                    type: string
+                    description: JWT access token
+                  refresh:
+                    type: string
+                    description: JWT refresh token
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/send-otp/:
+    post:
+      tags: [Authentication]
+      summary: Send OTP to mobile number
+      description: Send OTP for mobile number authentication
+      operationId: sendOTP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mobile_number]
+              properties:
+                mobile_number:
+                  type: string
+                  example: +919876543210
+      responses:
+        '200':
+          description: OTP sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  otp:
+                    type: string
+                    description: OTP (only in development)
+                  expires_in:
+                    type: integer
+                    description: OTP expiration time in seconds
+
+  /auth/verify-otp/:
+    post:
+      tags: [Authentication]
+      summary: Verify OTP and get tokens
+      description: Verify OTP and receive JWT tokens
+      operationId: verifyOTP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mobile_number, otp]
+              properties:
+                mobile_number:
+                  type: string
+                otp:
+                  type: string
+      responses:
+        '200':
+          description: OTP verified successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  user:
+                    $ref: '#/components/schemas/User'
+                  tokens:
+                    type: object
+                    properties:
+                      access:
+                        type: string
+                      refresh:
+                        type: string
+                  user_type:
+                    type: string
+                    enum: [existing, new]
+
+  /auth/token/refresh/:
+    post:
+      tags: [Authentication]
+      summary: Refresh access token
+      description: Get new access token using refresh token
+      operationId: refreshToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh]
+              properties:
+                refresh:
+                  type: string
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access:
+                    type: string
+
+  /users/profile/:
+    get:
+      tags: [Users]
+      summary: Get user profile
+      description: Get current authenticated user's profile
+      operationId: getUserProfile
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /users/profile/update/:
+    patch:
+      tags: [Users]
+      summary: Update user profile
+      description: Update current user's profile information
+      operationId: updateUserProfile
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                first_name:
+                  type: string
+                last_name:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                phone_number:
+                  type: string
+      responses:
+        '200':
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+  /addresses/:
+    get:
+      tags: [Addresses]
+      summary: List user addresses
+      description: Get all delivery addresses for the current user
+      operationId: listAddresses
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of addresses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Address'
+    
+    post:
+      tags: [Addresses]
+      summary: Create address
+      description: Create a new delivery address
+      operationId: createAddress
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddressInput'
+      responses:
+        '201':
+          description: Address created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Address'
+
+  /addresses/{id}/:
+    get:
+      tags: [Addresses]
+      summary: Get address details
+      operationId: getAddress
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Address details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Address'
+    
+    patch:
+      tags: [Addresses]
+      summary: Update address
+      operationId: updateAddress
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddressInput'
+      responses:
+        '200':
+          description: Address updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Address'
+    
+    delete:
+      tags: [Addresses]
+      summary: Delete address
+      operationId: deleteAddress
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Address deleted
+
+  /vendors/:
+    get:
+      tags: [Vendors]
+      summary: List vendors
+      description: Get list of restaurants/hotels
+      operationId: listVendors
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of vendors
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedVendors'
+
+  /vendors/{slug}/:
+    get:
+      tags: [Vendors]
+      summary: Get vendor details
+      operationId: getVendor
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Vendor details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vendor'
+
+  /products/:
+    get:
+      tags: [Products]
+      summary: List products
+      operationId: listProducts
+      parameters:
+        - name: vendor
+          in: query
+          schema:
+            type: string
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: min_price
+          in: query
+          schema:
+            type: number
+        - name: max_price
+          in: query
+          schema:
+            type: number
+        - name: is_available
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: List of products
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
+
+  /products/{slug}/:
+    get:
+      tags: [Products]
+      summary: Get product details
+      operationId: getProduct
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Product details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+
+  /cart/:
+    get:
+      tags: [Cart]
+      summary: Get user cart
+      description: Get shopping cart for a specific vendor
+      operationId: getCart
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: vendor
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Cart details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cart'
+
+  /cart/items/:
+    post:
+      tags: [Cart]
+      summary: Add item to cart
+      operationId: addToCart
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [product, quantity]
+              properties:
+                product:
+                  type: string
+                  format: uuid
+                quantity:
+                  type: integer
+                  minimum: 1
+                variant:
+                  type: string
+                  format: uuid
+      responses:
+        '201':
+          description: Item added to cart
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartItem'
+
+  /cart/items/{id}/:
+    patch:
+      tags: [Cart]
+      summary: Update cart item
+      operationId: updateCartItem
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                quantity:
+                  type: integer
+                  minimum: 1
+      responses:
+        '200':
+          description: Cart item updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartItem'
+    
+    delete:
+      tags: [Cart]
+      summary: Remove cart item
+      operationId: deleteCartItem
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Item removed
+
+  /orders/:
+    get:
+      tags: [Orders]
+      summary: List user orders
+      operationId: listOrders
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of orders
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedOrders'
+    
+    post:
+      tags: [Orders]
+      summary: Create order
+      operationId: createOrder
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderInput'
+      responses:
+        '201':
+          description: Order created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+
+  /orders/{id}/:
+    get:
+      tags: [Orders]
+      summary: Get order details
+      operationId: getOrder
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Order details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+
+  /payments/paytm/create-order/:
+    post:
+      tags: [Payments]
+      summary: Create Paytm payment order
+      description: Create a Paytm payment order for an existing order
+      operationId: createPaytmOrder
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [order_id]
+              properties:
+                order_id:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: Payment order created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  paytm_order_id:
+                    type: string
+                  paytm_params:
+                    type: object
+                  paytm_url:
+                    type: string
+                  amount:
+                    type: number
+
+  /payments/paytm/verify/:
+    post:
+      tags: [Payments]
+      summary: Verify Paytm payment
+      description: Verify payment after Paytm redirect
+      operationId: verifyPaytmPayment
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                ORDERID:
+                  type: string
+                TXNID:
+                  type: string
+                STATUS:
+                  type: string
+                CHECKSUMHASH:
+                  type: string
+      responses:
+        '200':
+          description: Payment verified
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  order_id:
+                    type: string
+                  payment_id:
+                    type: string
+
+  /wallet/:
+    get:
+      tags: [Wallet]
+      summary: Get wallet balance
+      operationId: getWallet
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Wallet details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Wallet'
+
+  /notifications/:
+    get:
+      tags: [Notifications]
+      summary: List notifications
+      operationId: listNotifications
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Notification'
+
+  /delivery/dashboard/:
+    get:
+      tags: [Delivery]
+      summary: Get delivery dashboard
+      description: Get dashboard data for delivery person
+      operationId: getDeliveryDashboard
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeliveryDashboard'
+
+  /dashboard/home/:
+    get:
+      tags: [Dashboard]
+      summary: Get hotel owner dashboard
+      description: Get dashboard statistics for hotel owner
+      operationId: getDashboardHome
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Dashboard statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardStats'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from login endpoint
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        first_name:
+          type: string
+        last_name:
+          type: string
+        phone_number:
+          type: string
+        user_role_name:
+          type: string
+        is_verified:
+          type: boolean
+
+    Address:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        address_line_1:
+          type: string
+        address_line_2:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        country:
+          type: string
+        postal_code:
+          type: string
+        is_default:
+          type: boolean
+        latitude:
+          type: number
+          format: double
+        longitude:
+          type: number
+          format: double
+
+    AddressInput:
+      type: object
+      required: [title, address_line_1, city, state, country, postal_code]
+      properties:
+        title:
+          type: string
+        address_line_1:
+          type: string
+        address_line_2:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        country:
+          type: string
+        postal_code:
+          type: string
+        is_default:
+          type: boolean
+        latitude:
+          type: number
+        longitude:
+          type: number
+
+    Vendor:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+        rating:
+          type: number
+          format: double
+        delivery_time:
+          type: integer
+        delivery_fee:
+          type: number
+        minimum_order:
+          type: number
+        is_active:
+          type: boolean
+        image:
+          type: string
+          format: uri
+
+    Product:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+        discounted_price:
+          type: number
+        vendor:
+          type: string
+          format: uuid
+        category:
+          type: string
+        is_available:
+          type: boolean
+        image:
+          type: string
+          format: uri
+
+    Cart:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        vendor:
+          $ref: '#/components/schemas/Vendor'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CartItem'
+        subtotal:
+          type: number
+        total:
+          type: number
+
+    CartItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        product:
+          $ref: '#/components/schemas/Product'
+        quantity:
+          type: integer
+        unit_price:
+          type: number
+        total_price:
+          type: number
+
+    Order:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        order_number:
+          type: string
+        vendor:
+          $ref: '#/components/schemas/Vendor'
+        items:
+          type: array
+          items:
+            type: object
+        total_amount:
+          type: number
+        order_status:
+          type: string
+        payment_status:
+          type: string
+        delivery_status:
+          type: string
+        order_placed_at:
+          type: string
+          format: date-time
+
+    OrderInput:
+      type: object
+      required: [vendor, delivery_address, items, total_amount, payment_method]
+      properties:
+        vendor:
+          type: string
+          format: uuid
+        delivery_address:
+          type: integer
+        items:
+          type: array
+          items:
+            type: object
+            required: [product, quantity, price]
+            properties:
+              product:
+                type: string
+                format: uuid
+              quantity:
+                type: integer
+              price:
+                type: number
+        subtotal:
+          type: number
+        delivery_fee:
+          type: number
+        total_amount:
+          type: number
+        payment_method:
+          type: string
+          enum: [cod, paytm]
+        scheduled_delivery_time:
+          type: string
+          format: date-time
+        customer_latitude:
+          type: number
+        customer_longitude:
+          type: number
+
+    Wallet:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        balance:
+          type: number
+        currency:
+          type: string
+
+    Notification:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        message:
+          type: string
+        type:
+          type: string
+        is_read:
+          type: boolean
+        created_on:
+          type: string
+          format: date-time
+
+    DeliveryDashboard:
+      type: object
+      properties:
+        delivery_person:
+          type: object
+        is_online:
+          type: boolean
+        active_assignments:
+          type: array
+        today_stats:
+          type: object
+          properties:
+            earnings:
+              type: number
+            deliveries:
+              type: integer
+            distance_km:
+              type: number
+
+    DashboardStats:
+      type: object
+      properties:
+        live_orders:
+          type: integer
+        today_revenue:
+          type: number
+        current_rating:
+          type: number
+        today_orders:
+          type: integer
+        delayed_orders:
+          type: integer
+        complaints:
+          type: integer
+
+    PaginatedVendors:
+      type: object
+      properties:
+        count:
+          type: integer
+        next:
+          type: string
+          nullable: true
+        previous:
+          type: string
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Vendor'
+
+    PaginatedOrders:
+      type: object
+      properties:
+        count:
+          type: integer
+        next:
+          type: string
+          nullable: true
+        previous:
+          type: string
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Order'
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        detail:
+          oneOf:
+            - type: string
+            - type: object
+        code:
+          type: string
+
+  responses:
+    BadRequest:
+      description: Bad request - validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    
+    Unauthorized:
+      description: Unauthorized - authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    
+    Forbidden:
+      description: Forbidden - insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
