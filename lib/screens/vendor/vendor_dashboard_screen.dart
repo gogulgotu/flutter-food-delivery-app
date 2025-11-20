@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../screens/auth/phone_number_screen.dart';
 import '../../services/api_service.dart';
+import '../../theme/app_theme.dart';
 
 /// Vendor Dashboard Screen
 /// 
@@ -45,7 +46,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error loading dashboard: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppTheme.error,
           ),
         );
       }
@@ -54,9 +55,22 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final authProvider = Provider.of<AuthProvider>(context);
+    final user = authProvider.user;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Vendor Dashboard'),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Vendor Dashboard'),
+            if (user != null)
+              Text(
+                'Welcome, ${user.firstName ?? user.phoneNumber ?? "Vendor"}',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
+              ),
+          ],
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.notifications_outlined),
@@ -161,7 +175,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                     'Live Orders',
                     '${_dashboardData!['live_orders'] ?? 0}',
                     Icons.shopping_bag_outlined,
-                    Colors.blue,
+                    AppTheme.primaryGreen,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -170,7 +184,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                     'Today\'s Revenue',
                     '₹${_dashboardData!['today_revenue']?.toStringAsFixed(0) ?? '0'}',
                     Icons.currency_rupee,
-                    Colors.green,
+                    AppTheme.success,
                   ),
                 ),
               ],
@@ -183,7 +197,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                     'Today\'s Orders',
                     '${_dashboardData!['today_orders'] ?? 0}',
                     Icons.receipt_outlined,
-                    Colors.orange,
+                    AppTheme.accentYellow,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -192,7 +206,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                     'Rating',
                     '${_dashboardData!['current_rating'] ?? '0.0'} ⭐',
                     Icons.star_outline,
-                    Colors.amber,
+                    AppTheme.warning,
                   ),
                 ),
               ],
@@ -216,8 +230,8 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
               _dashboardData!['restaurant_status'] == 'online' ? 'Online' : 'Offline',
               Icons.store,
               statusColor: _dashboardData!['restaurant_status'] == 'online'
-                  ? Colors.green
-                  : Colors.red,
+                  ? AppTheme.success
+                  : AppTheme.error,
             ),
             const SizedBox(height: 12),
             if (_dashboardData!['delayed_orders'] != null && _dashboardData!['delayed_orders'] > 0)
@@ -264,10 +278,10 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
             const SizedBox(height: 4),
             Text(
               title,
-              style: TextStyle(
-                color: Colors.grey[600],
-                fontSize: 12,
-              ),
+                style: TextStyle(
+                  color: AppTheme.textSecondary,
+                  fontSize: 12,
+                ),
             ),
           ],
         ),
@@ -293,9 +307,9 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
 
   Widget _buildAlertCard(String title, String message, IconData icon) {
     return Card(
-      color: Colors.orange[50],
+      color: AppTheme.warningBg,
       child: ListTile(
-        leading: Icon(icon, color: Colors.orange),
+        leading: Icon(icon, color: AppTheme.warningDark),
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Text(message),
         trailing: const Icon(Icons.chevron_right),
@@ -313,18 +327,18 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.receipt_long_outlined, size: 64, color: Colors.grey[400]),
+          Icon(Icons.receipt_long_outlined, size: 64, color: AppTheme.textMuted),
           const SizedBox(height: 16),
           Text(
             'Orders Management',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: Colors.grey[600],
+                  color: AppTheme.textSecondary,
                 ),
           ),
           const SizedBox(height: 8),
           Text(
             'Order management feature coming soon',
-            style: TextStyle(color: Colors.grey[500]),
+            style: TextStyle(color: AppTheme.textTertiary),
           ),
           // TODO: Implement orders list with API integration
           // Use: GET /api/dashboard/orders/
@@ -338,18 +352,18 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.restaurant_menu_outlined, size: 64, color: Colors.grey[400]),
+          Icon(Icons.restaurant_menu_outlined, size: 64, color: AppTheme.textMuted),
           const SizedBox(height: 16),
           Text(
             'Menu Management',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: Colors.grey[600],
+                  color: AppTheme.textSecondary,
                 ),
           ),
           const SizedBox(height: 8),
           Text(
             'Menu management feature coming soon',
-            style: TextStyle(color: Colors.grey[500]),
+            style: TextStyle(color: AppTheme.textTertiary),
           ),
           // TODO: Implement menu management with API integration
           // Use: GET /api/products/ with vendor filter
@@ -363,18 +377,18 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.analytics_outlined, size: 64, color: Colors.grey[400]),
+          Icon(Icons.analytics_outlined, size: 64, color: AppTheme.textMuted),
           const SizedBox(height: 16),
           Text(
             'Analytics',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: Colors.grey[600],
+                  color: AppTheme.textSecondary,
                 ),
           ),
           const SizedBox(height: 8),
           Text(
             'Analytics feature coming soon',
-            style: TextStyle(color: Colors.grey[500]),
+            style: TextStyle(color: AppTheme.textTertiary),
           ),
           // TODO: Implement analytics with charts and graphs
         ],

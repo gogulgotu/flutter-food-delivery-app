@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:intl_phone_field/intl_phone_field.dart';
+import 'package:flutter/services.dart';
 import '../../providers/auth_provider.dart';
 import '../../utils/phone_utils.dart';
 import 'otp_screen.dart';
@@ -18,8 +18,13 @@ class PhoneNumberScreen extends StatefulWidget {
 class _PhoneNumberScreenState extends State<PhoneNumberScreen> {
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
-  String _fullPhoneNumber = '';
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Controller starts empty, prefixText will show +91
+  }
 
   @override
   void dispose() {
@@ -27,17 +32,35 @@ class _PhoneNumberScreenState extends State<PhoneNumberScreen> {
     super.dispose();
   }
 
+  String _getFullPhoneNumber() {
+    final text = _phoneController.text.replaceAll(RegExp(r'[\s-]'), '');
+    // Always prepend +91 since prefixText shows it
+    if (text.isEmpty) {
+      return '+91';
+    }
+    // If user somehow entered +91, use it, otherwise prepend
+    if (text.startsWith('+91')) {
+      return text;
+    } else if (text.startsWith('91') && text.length >= 2) {
+      return '+$text';
+    } else {
+      return '+91$text';
+    }
+  }
+
   Future<void> _sendOtp() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
+
+    final phoneNumber = _getFullPhoneNumber();
 
     setState(() {
       _isLoading = true;
     });
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final success = await authProvider.sendOtp(_fullPhoneNumber);
+    final success = await authProvider.sendOtp(phoneNumber);
 
     setState(() {
       _isLoading = false;
@@ -46,11 +69,15 @@ class _PhoneNumberScreenState extends State<PhoneNumberScreen> {
     if (!mounted) return;
 
     if (success) {
-      // Navigate to OTP screen
+      // Navigate to OTP screen with OTP if available (development)
+      final otp = authProvider.lastOtp;
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => OtpScreen(phoneNumber: _fullPhoneNumber),
+          builder: (context) => OtpScreen(
+            phoneNumber: phoneNumber,
+            developmentOtp: otp,
+          ),
         ),
       );
     } else {
@@ -60,7 +87,7 @@ class _PhoneNumberScreenState extends State<PhoneNumberScreen> {
           content: Text(
             authProvider.errorMessage ?? 'Failed to send OTP. Please try again.',
           ),
-          backgroundColor: Colors.red,
+          backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
     }
@@ -97,33 +124,70 @@ class _PhoneNumberScreenState extends State<PhoneNumberScreen> {
                 Text(
                   'Enter your mobile number to continue',
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: Colors.grey[600],
+                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                       ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 48),
-                // Phone Number Input
-                IntlPhoneField(
+                // Phone Number Input (Indian numbers only - exactly 10 digits)
+                TextFormField(
                   controller: _phoneController,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(10), // Exactly 10 digits
+                  ],
                   decoration: InputDecoration(
                     labelText: 'Mobile Number',
+                    hintText: '9876543210',
+                    prefixIcon: const Icon(Icons.phone),
+                    prefixText: '+91 ',
+                    prefixStyle: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    prefixIcon: const Icon(Icons.phone),
+                    filled: true,
+                    fillColor: Theme.of(context).colorScheme.surface,
                   ),
-                  initialCountryCode: 'IN',
-                  onChanged: (phone) {
-                    _fullPhoneNumber = phone.completeNumber;
-                  },
-                  validator: (phone) {
-                    if (phone == null || phone.number.isEmpty) {
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
                       return 'Please enter your mobile number';
                     }
-                    if (!PhoneUtils.isValidIndianPhoneNumber(phone.completeNumber)) {
-                      return 'Please enter a valid Indian mobile number';
+                    // Check if exactly 10 digits
+                    final digitsOnly = value.replaceAll(RegExp(r'[^0-9]'), '');
+                    if (digitsOnly.length != 10) {
+                      return 'Please enter exactly 10 digits';
+                    }
+                    // Check if starts with 6, 7, 8, or 9
+                    if (!RegExp(r'^[6-9]').hasMatch(digitsOnly)) {
+                      return 'Mobile number must start with 6, 7, 8, or 9';
+                    }
+                    final phoneNumber = _getFullPhoneNumber();
+                    if (!PhoneUtils.isValidIndianPhoneNumber(phoneNumber)) {
+                      return 'Please enter a valid 10-digit Indian mobile number';
                     }
                     return null;
+                  },
+                  onChanged: (value) {
+                    // Ensure only digits are entered
+                    final digitsOnly = value.replaceAll(RegExp(r'[^0-9]'), '');
+                    if (digitsOnly != value && digitsOnly.length <= 10) {
+                      _phoneController.value = TextEditingValue(
+                        text: digitsOnly,
+                        selection: TextSelection.collapsed(offset: digitsOnly.length),
+                      );
+                    } else if (digitsOnly.length > 10) {
+                      // Limit to 10 digits
+                      final limited = digitsOnly.substring(0, 10);
+                      _phoneController.value = TextEditingValue(
+                        text: limited,
+                        selection: TextSelection.collapsed(offset: 10),
+                      );
+                    }
                   },
                 ),
                 const SizedBox(height: 32),
@@ -158,7 +222,7 @@ class _PhoneNumberScreenState extends State<PhoneNumberScreen> {
                 Text(
                   'By continuing, you agree to our Terms of Service and Privacy Policy',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.grey[600],
+                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                       ),
                   textAlign: TextAlign.center,
                 ),

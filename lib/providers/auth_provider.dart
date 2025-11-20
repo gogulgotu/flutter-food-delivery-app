@@ -14,11 +14,13 @@ class AuthProvider with ChangeNotifier {
   bool _isLoading = false;
   String? _errorMessage;
   bool _isAuthenticated = false;
+  String? _lastOtp; // Store OTP for development mode
 
   UserModel? get user => _user;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get isAuthenticated => _isAuthenticated;
+  String? get lastOtp => _lastOtp; // Get OTP for development display
 
   /// Initialize auth state from storage
   Future<void> initialize() async {
@@ -40,19 +42,23 @@ class AuthProvider with ChangeNotifier {
   }
 
   /// Send OTP to mobile number
+  /// Returns the OTP if available (development mode)
   Future<bool> sendOtp(String mobileNumber) async {
     _isLoading = true;
     _errorMessage = null;
+    _lastOtp = null; // Clear previous OTP
     notifyListeners();
 
     try {
       final response = await _apiService.sendOtp(mobileNumber);
+      _lastOtp = response.otp; // Store OTP for development display
       _isLoading = false;
       notifyListeners();
       return response.success;
     } catch (e) {
       _isLoading = false;
       _errorMessage = e.toString();
+      _lastOtp = null;
       notifyListeners();
       return false;
     }

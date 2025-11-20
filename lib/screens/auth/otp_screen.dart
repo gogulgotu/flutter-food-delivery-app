@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/user_model.dart';
+import '../../theme/app_theme.dart';
 import '../customer/customer_dashboard_screen.dart';
 import '../vendor/vendor_dashboard_screen.dart';
 import '../delivery/delivery_dashboard_screen.dart';
@@ -11,10 +12,12 @@ import '../delivery/delivery_dashboard_screen.dart';
 /// Screen where users enter the OTP received on their mobile number
 class OtpScreen extends StatefulWidget {
   final String phoneNumber;
+  final String? developmentOtp; // OTP from backend in development mode
 
   const OtpScreen({
     super.key,
     required this.phoneNumber,
+    this.developmentOtp,
   });
 
   @override
@@ -33,6 +36,22 @@ class _OtpScreenState extends State<OtpScreen> {
   void initState() {
     super.initState();
     _startResendTimer();
+    // Auto-fill OTP if available (development mode)
+    if (widget.developmentOtp != null && widget.developmentOtp!.length == 6) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _fillOtp(widget.developmentOtp!);
+      });
+    }
+  }
+
+  void _fillOtp(String otp) {
+    for (int i = 0; i < 6 && i < otp.length; i++) {
+      _otpControllers[i].text = otp[i];
+    }
+    // Focus on last field
+    if (_focusNodes.isNotEmpty) {
+      _focusNodes[5].requestFocus();
+    }
   }
 
   @override
@@ -81,9 +100,9 @@ class _OtpScreenState extends State<OtpScreen> {
     final otp = _getOtp();
     if (otp.length != 6) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter the complete OTP'),
-          backgroundColor: Colors.red,
+        SnackBar(
+          content: const Text('Please enter the complete OTP'),
+          backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
       return;
@@ -102,7 +121,23 @@ class _OtpScreenState extends State<OtpScreen> {
 
     if (!mounted) return;
 
-    if (success) {
+    if (success && authProvider.user != null) {
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Login successful! Welcome, ${authProvider.user!.displayName}',
+          ),
+          backgroundColor: AppTheme.success,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+
+      // Small delay to show success message, then navigate
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      if (!mounted) return;
+
       // Navigate to appropriate dashboard based on role
       _navigateToDashboard(authProvider.user!.role);
     } else {
@@ -111,7 +146,7 @@ class _OtpScreenState extends State<OtpScreen> {
           content: Text(
             authProvider.errorMessage ?? 'Invalid OTP. Please try again.',
           ),
-          backgroundColor: Colors.red,
+          backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
     }
@@ -154,10 +189,20 @@ class _OtpScreenState extends State<OtpScreen> {
 
     if (success) {
       _startResendTimer();
+      // Get the new OTP if available (development mode)
+      final newOtp = authProvider.lastOtp;
+      if (newOtp != null && newOtp.length == 6) {
+        _fillOtp(newOtp);
+      }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('OTP sent successfully'),
-          backgroundColor: Colors.green,
+        SnackBar(
+          content: Text(
+            newOtp != null
+                ? 'OTP sent successfully. OTP: $newOtp (Development)'
+                : 'OTP sent successfully',
+          ),
+          backgroundColor: AppTheme.success,
+          duration: const Duration(seconds: 3),
         ),
       );
     } else {
@@ -166,7 +211,7 @@ class _OtpScreenState extends State<OtpScreen> {
           content: Text(
             authProvider.errorMessage ?? 'Failed to resend OTP. Please try again.',
           ),
-          backgroundColor: Colors.red,
+          backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
     }
@@ -204,11 +249,68 @@ class _OtpScreenState extends State<OtpScreen> {
               Text(
                 'We sent a 6-digit code to\n${widget.phoneNumber}',
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: Colors.grey[600],
+                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                     ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 48),
+              // Show OTP in development mode
+              if (widget.developmentOtp != null) ...[
+                const SizedBox(height: 24),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppTheme.warningBg,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppTheme.warning),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.developer_mode, color: AppTheme.warningDark, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Development Mode',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.textPrimary,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Your OTP is:',
+                        style: TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        widget.developmentOtp!,
+                        style: TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.textPrimary,
+                          letterSpacing: 8,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '(This is only shown in development)',
+                        style: TextStyle(
+                          color: AppTheme.textMuted,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              const SizedBox(height: 24),
               // OTP Input Fields
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -289,7 +391,7 @@ class _OtpScreenState extends State<OtpScreen> {
                       style: TextStyle(
                         color: _canResend
                             ? Theme.of(context).colorScheme.primary
-                            : Colors.grey,
+                            : AppTheme.textMuted,
                       ),
                     ),
                   ),

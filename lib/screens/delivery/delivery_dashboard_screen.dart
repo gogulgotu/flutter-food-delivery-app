@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../screens/auth/phone_number_screen.dart';
 import '../../services/api_service.dart';
+import '../../theme/app_theme.dart';
 
 /// Delivery Person Dashboard Screen
 /// 
@@ -47,7 +48,7 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error loading dashboard: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppTheme.error,
           ),
         );
       }
@@ -64,7 +65,7 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(_isOnline ? 'You are now online' : 'You are now offline'),
-          backgroundColor: Colors.green,
+            backgroundColor: AppTheme.success,
         ),
       );
     } catch (e) {
@@ -79,16 +80,29 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final authProvider = Provider.of<AuthProvider>(context);
+    final user = authProvider.user;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Delivery Dashboard'),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Delivery Dashboard'),
+            if (user != null)
+              Text(
+                'Welcome, ${user.firstName ?? user.phoneNumber ?? "Delivery Person"}',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
+              ),
+          ],
+        ),
         actions: [
           // Online/Offline Toggle
           Switch(
             value: _isOnline,
             onChanged: (value) => _toggleOnlineStatus(),
-            activeTrackColor: Colors.green,
-            activeColor: Colors.green,
+            activeTrackColor: AppTheme.success,
+            activeColor: AppTheme.success,
           ),
           const SizedBox(width: 8),
           PopupMenuButton<String>(
@@ -174,14 +188,14 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
           children: [
             // Status Card
             Card(
-              color: _isOnline ? Colors.green[50] : Colors.grey[200],
+              color: _isOnline ? AppTheme.successBg : AppTheme.bgLightGray,
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Row(
                   children: [
                     Icon(
                       _isOnline ? Icons.check_circle : Icons.cancel,
-                      color: _isOnline ? Colors.green : Colors.grey,
+                      color: _isOnline ? AppTheme.success : AppTheme.textMuted,
                       size: 32,
                     ),
                     const SizedBox(width: 16),
@@ -200,7 +214,7 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
                             _isOnline
                                 ? 'Ready to accept deliveries'
                                 : 'Turn on to start receiving orders',
-                            style: TextStyle(color: Colors.grey[600]),
+                            style: TextStyle(color: AppTheme.textSecondary),
                           ),
                         ],
                       ),
@@ -254,7 +268,7 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
                       'Earnings',
                       '₹${todayStats['earnings']?.toStringAsFixed(0) ?? '0'}',
                       Icons.currency_rupee,
-                      Colors.green,
+                      AppTheme.success,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -263,7 +277,7 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
                       'Deliveries',
                       '${todayStats['deliveries'] ?? 0}',
                       Icons.local_shipping,
-                      Colors.blue,
+                      AppTheme.primaryGreen,
                     ),
                   ),
                 ],
@@ -273,7 +287,7 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
                 'Distance',
                 '${todayStats['distance_km']?.toStringAsFixed(1) ?? '0.0'} km',
                 Icons.straighten,
-                Colors.orange,
+                AppTheme.accentYellow,
                 fullWidth: true,
               ),
             ],
@@ -363,7 +377,7 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
                   Text(
                     title,
                     style: TextStyle(
-                      color: Colors.grey[600],
+                      color: AppTheme.textSecondary,
                       fontSize: 12,
                     ),
                   ),
@@ -378,18 +392,18 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.local_shipping_outlined, size: 64, color: Colors.grey[400]),
+          Icon(Icons.local_shipping_outlined, size: 64, color: AppTheme.textMuted),
           const SizedBox(height: 16),
           Text(
             'Active Deliveries',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: Colors.grey[600],
+                  color: AppTheme.textSecondary,
                 ),
           ),
           const SizedBox(height: 8),
           Text(
             'Active deliveries feature coming soon',
-            style: TextStyle(color: Colors.grey[500]),
+            style: TextStyle(color: AppTheme.textTertiary),
           ),
           // TODO: Implement active deliveries list
           // Use: GET /api/delivery/dashboard/ and parse active_assignments
@@ -403,18 +417,18 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.history_outlined, size: 64, color: Colors.grey[400]),
+          Icon(Icons.history_outlined, size: 64, color: AppTheme.textMuted),
           const SizedBox(height: 16),
           Text(
             'Delivery History',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: Colors.grey[600],
+                  color: AppTheme.textSecondary,
                 ),
           ),
           const SizedBox(height: 8),
           Text(
             'Delivery history feature coming soon',
-            style: TextStyle(color: Colors.grey[500]),
+            style: TextStyle(color: AppTheme.textTertiary),
           ),
           // TODO: Implement delivery history
         ],
@@ -501,10 +515,10 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
     bool isDestructive = false,
   }) {
     return ListTile(
-      leading: Icon(icon, color: isDestructive ? Colors.red : null),
+      leading: Icon(icon, color: isDestructive ? AppTheme.error : null),
       title: Text(
         title,
-        style: TextStyle(color: isDestructive ? Colors.red : null),
+        style: TextStyle(color: isDestructive ? AppTheme.error : null),
       ),
       trailing: const Icon(Icons.chevron_right),
       onTap: onTap,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../screens/auth/phone_number_screen.dart';
+import '../../theme/app_theme.dart';
 
 /// Customer Dashboard Screen
 /// 
@@ -18,9 +19,22 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final authProvider = Provider.of<AuthProvider>(context);
+    final user = authProvider.user;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Food Delivery'),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Food Delivery'),
+            if (user != null)
+              Text(
+                'Welcome, ${user.firstName ?? user.phoneNumber ?? "User"}',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
+              ),
+          ],
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.notifications_outlined),
@@ -125,8 +139,8 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
-                filled: true,
-                fillColor: Colors.grey[100],
+                    filled: true,
+                    fillColor: AppTheme.bgLightGray,
               ),
               onTap: () {
                 // TODO: Navigate to search screen
@@ -154,11 +168,11 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                   child: ListView(
                     scrollDirection: Axis.horizontal,
                     children: [
-                      _buildCategoryCard('Pizza', Icons.local_pizza, Colors.orange),
-                      _buildCategoryCard('Burger', Icons.lunch_dining, Colors.red),
-                      _buildCategoryCard('Chinese', Icons.ramen_dining, Colors.amber),
-                      _buildCategoryCard('Desserts', Icons.cake, Colors.pink),
-                      _buildCategoryCard('Beverages', Icons.local_drink, Colors.blue),
+                      _buildCategoryCard('Pizza', Icons.local_pizza, AppTheme.accentYellow),
+                      _buildCategoryCard('Burger', Icons.lunch_dining, AppTheme.primaryGreen),
+                      _buildCategoryCard('Chinese', Icons.ramen_dining, AppTheme.accentYellowDark),
+                      _buildCategoryCard('Desserts', Icons.cake, AppTheme.accentLeafGreen),
+                      _buildCategoryCard('Beverages', Icons.local_drink, AppTheme.primaryGreenLight),
                     ],
                   ),
                 ),
@@ -238,7 +252,7 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
           width: 60,
           height: 60,
           decoration: BoxDecoration(
-            color: Colors.grey[300],
+            color: AppTheme.bgGray,
             borderRadius: BorderRadius.circular(8),
           ),
           child: const Icon(Icons.restaurant, size: 30),
@@ -249,7 +263,7 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
           children: [
             Text(subtitle),
             const SizedBox(height: 4),
-            Text(description, style: TextStyle(color: Colors.grey[600])),
+            Text(description, style: TextStyle(color: AppTheme.textSecondary)),
           ],
         ),
         trailing: const Icon(Icons.chevron_right),
@@ -268,18 +282,18 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.receipt_long_outlined, size: 64, color: Colors.grey[400]),
+          Icon(Icons.receipt_long_outlined, size: 64, color: AppTheme.textMuted),
           const SizedBox(height: 16),
           Text(
             'No orders yet',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: Colors.grey[600],
+                  color: AppTheme.textSecondary,
                 ),
           ),
           const SizedBox(height: 8),
           Text(
             'Your order history will appear here',
-            style: TextStyle(color: Colors.grey[500]),
+            style: TextStyle(color: AppTheme.textTertiary),
           ),
           const SizedBox(height: 24),
           ElevatedButton(
@@ -300,18 +314,18 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.shopping_cart_outlined, size: 64, color: Colors.grey[400]),
+          Icon(Icons.shopping_cart_outlined, size: 64, color: AppTheme.textMuted),
           const SizedBox(height: 16),
           Text(
             'Your cart is empty',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: Colors.grey[600],
+                  color: AppTheme.textSecondary,
                 ),
           ),
           const SizedBox(height: 8),
           Text(
             'Add items to your cart to continue',
-            style: TextStyle(color: Colors.grey[500]),
+            style: TextStyle(color: AppTheme.textTertiary),
           ),
           const SizedBox(height: 24),
           ElevatedButton(
@@ -354,7 +368,7 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
           const SizedBox(height: 4),
           Text(
             user?.phoneNumber ?? '',
-            style: TextStyle(color: Colors.grey[600]),
+            style: TextStyle(color: AppTheme.textSecondary),
           ),
           const SizedBox(height: 32),
           // Menu Items
@@ -426,10 +440,10 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
     bool isDestructive = false,
   }) {
     return ListTile(
-      leading: Icon(icon, color: isDestructive ? Colors.red : null),
+      leading: Icon(icon, color: isDestructive ? AppTheme.error : null),
       title: Text(
         title,
-        style: TextStyle(color: isDestructive ? Colors.red : null),
+        style: TextStyle(color: isDestructive ? AppTheme.error : null),
       ),
       trailing: const Icon(Icons.chevron_right),
       onTap: onTap,
