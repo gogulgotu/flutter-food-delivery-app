@@ -54,9 +54,6 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context);
-    final user = authProvider.user;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Vendor Dashboard'),
@@ -250,7 +247,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
+                    color: color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
@@ -404,16 +401,16 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
       ),
     );
 
-    if (confirm == true && mounted) {
+    if (confirm == true) {
+      if (!mounted) return;
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       await authProvider.logout();
 
-      if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const PhoneNumberScreen()),
-          (route) => false,
-        );
-      }
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const PhoneNumberScreen()),
+        (route) => false,
+      );
     }
   }
 }

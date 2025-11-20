@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
-import '../../utils/route_utils.dart';
 import '../../models/user_model.dart';
 import '../customer/customer_dashboard_screen.dart';
 import '../vendor/vendor_dashboard_screen.dart';
@@ -52,17 +51,16 @@ class _OtpScreenState extends State<OtpScreen> {
     _resendTimer = 60;
     Future.doWhile(() async {
       await Future.delayed(const Duration(seconds: 1));
-      if (mounted) {
-        setState(() {
-          _resendTimer--;
-          if (_resendTimer <= 0) {
-            _canResend = true;
-            return false;
-          }
-        });
-        return true;
-      }
-      return false;
+      if (!mounted) return false;
+      
+      setState(() {
+        _resendTimer--;
+        if (_resendTimer <= 0) {
+          _canResend = true;
+        }
+      });
+      
+      return _resendTimer > 0;
     });
   }
 

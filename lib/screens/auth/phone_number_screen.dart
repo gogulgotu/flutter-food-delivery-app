@@ -18,7 +18,6 @@ class PhoneNumberScreen extends StatefulWidget {
 class _PhoneNumberScreenState extends State<PhoneNumberScreen> {
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
-  String _countryCode = '+91'; // Default to India
   String _fullPhoneNumber = '';
   bool _isLoading = false;
 
@@ -115,7 +114,6 @@ class _PhoneNumberScreenState extends State<PhoneNumberScreen> {
                   ),
                   initialCountryCode: 'IN',
                   onChanged: (phone) {
-                    _countryCode = phone.countryCode;
                     _fullPhoneNumber = phone.completeNumber;
                   },
                   validator: (phone) {

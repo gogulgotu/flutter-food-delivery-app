@@ -18,9 +18,6 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context);
-    final user = authProvider.user;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Food Delivery'),
@@ -217,7 +214,7 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
             width: 60,
             height: 60,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(icon, color: color, size: 30),
@@ -458,16 +455,16 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
       ),
     );
 
-    if (confirm == true && mounted) {
+    if (confirm == true) {
+      if (!mounted) return;
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       await authProvider.logout();
 
-      if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const PhoneNumberScreen()),
-          (route) => false,
-        );
-      }
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const PhoneNumberScreen()),
+        (route) => false,
+      );
     }
   }
 }

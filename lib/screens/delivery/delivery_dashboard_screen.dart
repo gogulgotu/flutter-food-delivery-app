@@ -79,9 +79,6 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context);
-    final user = authProvider.user;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Delivery Dashboard'),
@@ -90,6 +87,7 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
           Switch(
             value: _isOnline,
             onChanged: (value) => _toggleOnlineStatus(),
+            activeTrackColor: Colors.green,
             activeColor: Colors.green,
           ),
           const SizedBox(width: 8),
@@ -532,16 +530,16 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
       ),
     );
 
-    if (confirm == true && mounted) {
+    if (confirm == true) {
+      if (!mounted) return;
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       await authProvider.logout();
 
-      if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const PhoneNumberScreen()),
-          (route) => false,
-        );
-      }
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const PhoneNumberScreen()),
+        (route) => false,
+      );
     }
   }
 }
