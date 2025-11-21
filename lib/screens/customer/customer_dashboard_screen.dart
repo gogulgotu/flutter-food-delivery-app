@@ -1,12 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/customer_dashboard_provider.dart';
 import '../../screens/auth/phone_number_screen.dart';
 import '../../theme/app_theme.dart';
+import '../../models/order_model.dart';
+import '../../models/notification_model.dart';
+import '../../models/wallet_model.dart';
+import '../../widgets/oval_bottom_nav_bar.dart';
+import 'customer_home_screen.dart';
 
 /// Customer Dashboard Screen
 /// 
-/// Main dashboard for customers to browse restaurants, view orders, etc.
+/// Main dashboard for customers with overview of activity, orders, wallet, and notifications
 class CustomerDashboardScreen extends StatefulWidget {
   const CustomerDashboardScreen({super.key});
 
@@ -18,9 +25,20 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
   int _selectedIndex = 0;
 
   @override
+  void initState() {
+    super.initState();
+    // Load dashboard data when screen initializes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<CustomerDashboardProvider>().loadDashboardData();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
     final user = authProvider.user;
+    final isTablet = MediaQuery.of(context).size.width >= 600;
+    final isDesktop = MediaQuery.of(context).size.width >= 1024;
 
     return Scaffold(
       appBar: AppBar(
@@ -36,12 +54,45 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () {
-              // TODO: Navigate to notifications screen
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Notifications feature coming soon')),
+          Consumer<CustomerDashboardProvider>(
+            builder: (context, provider, _) {
+              final unreadCount = provider.unreadCount;
+              return Stack(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.notifications_outlined),
+                    onPressed: () {
+                      setState(() {
+                        _selectedIndex = 3; // Navigate to notifications tab
+                      });
+                    },
+                  ),
+                  if (unreadCount > 0)
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: AppTheme.error,
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        child: Text(
+                          unreadCount > 9 ? '9+' : '$unreadCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
               );
             },
           ),
@@ -50,27 +101,26 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
               if (value == 'logout') {
                 _handleLogout(context);
               } else if (value == 'profile') {
-                // TODO: Navigate to profile screen
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Profile feature coming soon')),
-                );
+                setState(() {
+                  _selectedIndex = 4; // Navigate to profile tab
+                });
               }
             },
             itemBuilder: (context) => [
-              PopupMenuItem(
+              const PopupMenuItem(
                 value: 'profile',
                 child: Row(
-                  children: const [
+                  children: [
                     Icon(Icons.person_outline),
                     SizedBox(width: 8),
                     Text('Profile'),
                   ],
                 ),
               ),
-              PopupMenuItem(
+              const PopupMenuItem(
                 value: 'logout',
                 child: Row(
-                  children: const [
+                  children: [
                     Icon(Icons.logout),
                     SizedBox(width: 8),
                     Text('Logout'),
@@ -81,42 +131,56 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
           ),
         ],
       ),
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: [
-          _buildHomeTab(),
-          _buildOrdersTab(),
-          _buildCartTab(),
-          _buildProfileTab(),
-        ],
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          // Adaptive layout based on screen size
+          Widget content;
+          if (isDesktop) {
+            content = _buildDesktopLayout();
+          } else if (isTablet) {
+            content = _buildTabletLayout();
+          } else {
+            content = _buildMobileLayout();
+          }
+          
+          // Add bottom padding for all screens to prevent overlap with oval nav bar
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 20),
+            child: content,
+          );
+        },
       ),
-      bottomNavigationBar: BottomNavigationBar(
+      bottomNavigationBar: OvalBottomNavBar(
         currentIndex: _selectedIndex,
         onTap: (index) {
           setState(() {
             _selectedIndex = index;
           });
         },
-        type: BottomNavigationBarType.fixed,
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home),
-            label: 'Home',
+          OvalNavBarItem(
+            icon: Icons.dashboard_outlined,
+            activeIcon: Icons.dashboard,
+            label: 'Dashboard',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.receipt_long_outlined),
-            activeIcon: Icon(Icons.receipt_long),
+          OvalNavBarItem(
+            icon: Icons.receipt_long_outlined,
+            activeIcon: Icons.receipt_long,
             label: 'Orders',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.shopping_cart_outlined),
-            activeIcon: Icon(Icons.shopping_cart),
-            label: 'Cart',
+          OvalNavBarItem(
+            icon: Icons.wallet_outlined,
+            activeIcon: Icons.wallet,
+            label: 'Wallet',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person),
+          OvalNavBarItem(
+            icon: Icons.notifications_outlined,
+            activeIcon: Icons.notifications,
+            label: 'Notifications',
+          ),
+          OvalNavBarItem(
+            icon: Icons.person_outline,
+            activeIcon: Icons.person,
             label: 'Profile',
           ),
         ],
@@ -124,220 +188,742 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
     );
   }
 
-  Widget _buildHomeTab() {
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Search Bar
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: 'Search restaurants, dishes...',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                    filled: true,
-                    fillColor: AppTheme.bgLightGray,
-              ),
-              onTap: () {
-                // TODO: Navigate to search screen
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Search feature coming soon')),
-                );
-              },
-            ),
-          ),
-          // Categories Section
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Categories',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  height: 100,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    children: [
-                      _buildCategoryCard('Pizza', Icons.local_pizza, AppTheme.accentYellow),
-                      _buildCategoryCard('Burger', Icons.lunch_dining, AppTheme.primaryGreen),
-                      _buildCategoryCard('Chinese', Icons.ramen_dining, AppTheme.accentYellowDark),
-                      _buildCategoryCard('Desserts', Icons.cake, AppTheme.accentLeafGreen),
-                      _buildCategoryCard('Beverages', Icons.local_drink, AppTheme.primaryGreenLight),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          // Restaurants Section
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Popular Restaurants',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                ),
-                const SizedBox(height: 12),
-                // TODO: Replace with actual restaurant list from API
-                _buildRestaurantCard(
-                  'Pizza Palace',
-                  'Italian • 4.5 ⭐ • 30 min',
-                  'Best pizza in town',
-                ),
-                _buildRestaurantCard(
-                  'Burger King',
-                  'Fast Food • 4.2 ⭐ • 25 min',
-                  'Delicious burgers and fries',
-                ),
-                _buildRestaurantCard(
-                  'Chinese Express',
-                  'Chinese • 4.7 ⭐ • 35 min',
-                  'Authentic Chinese cuisine',
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-        ],
-      ),
+  Widget _buildMobileLayout() {
+    return IndexedStack(
+      index: _selectedIndex,
+      children: [
+        const CustomerHomeScreen(), // Catalog home screen
+        _buildOrdersTab(),
+        _buildWalletTab(),
+        _buildNotificationsTab(),
+        _buildProfileTab(),
+      ],
     );
   }
 
-  Widget _buildCategoryCard(String name, IconData icon, Color color) {
-    return Container(
-      width: 80,
-      margin: const EdgeInsets.only(right: 12),
-      child: Column(
-        children: [
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: color, size: 30),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            name,
-            style: const TextStyle(fontSize: 12),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
+  Widget _buildTabletLayout() {
+    // Use same layout as mobile but with adaptive spacing
+    return IndexedStack(
+      index: _selectedIndex,
+      children: [
+        const CustomerHomeScreen(), // Catalog home screen
+        _buildOrdersTab(),
+        _buildWalletTab(),
+        _buildNotificationsTab(),
+        _buildProfileTab(),
+      ],
     );
   }
 
-  Widget _buildRestaurantCard(String name, String subtitle, String description) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        leading: Container(
-          width: 60,
-          height: 60,
-          decoration: BoxDecoration(
-            color: AppTheme.bgGray,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: const Icon(Icons.restaurant, size: 30),
+  Widget _buildDesktopLayout() {
+    // Use same layout as mobile/tablet but with adaptive spacing
+    // The oval navbar will be at the bottom for all screen sizes
+    return IndexedStack(
+      index: _selectedIndex,
+      children: [
+        const CustomerHomeScreen(), // Catalog home screen
+        _buildOrdersTab(),
+        _buildWalletTab(),
+        _buildNotificationsTab(),
+        _buildProfileTab(),
+      ],
+    );
+  }
+
+  Widget _buildDashboardTab() {
+    return RefreshIndicator(
+      onRefresh: () => context.read<CustomerDashboardProvider>().refresh(),
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        child: Consumer<CustomerDashboardProvider>(
+          builder: (context, provider, _) {
+            if (provider.isLoading && provider.wallet == null) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(32.0),
+                  child: CircularProgressIndicator(),
+                ),
+              );
+            }
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Wallet Balance Card
+                _buildWalletBalanceCard(provider),
+                const SizedBox(height: 16),
+                
+                // Quick Stats Row
+                _buildQuickStatsRow(provider),
+                const SizedBox(height: 24),
+                
+                // Recent Orders Section
+                _buildRecentOrdersSection(provider),
+                const SizedBox(height: 24),
+                
+                // Recent Notifications Section
+                _buildRecentNotificationsSection(provider),
+              ],
+            );
+          },
         ),
-        title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Column(
+      ),
+    );
+  }
+
+  Widget _buildWalletBalanceCard(CustomerDashboardProvider provider) {
+    final wallet = provider.wallet;
+    final isLoading = provider.isLoadingWallet;
+
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: LinearGradient(
+            colors: [
+              AppTheme.primaryGreen,
+              AppTheme.primaryGreenDark,
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        padding: const EdgeInsets.all(24),
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(subtitle),
-            const SizedBox(height: 4),
-            Text(description, style: TextStyle(color: AppTheme.textSecondary)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Wallet Balance',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.refresh, color: Colors.white),
+                  onPressed: isLoading
+                      ? null
+                      : () => provider.loadWalletBalance(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (isLoading)
+              const SizedBox(
+                height: 40,
+                child: Center(
+                  child: CircularProgressIndicator(color: Colors.white),
+                ),
+              )
+            else if (wallet != null)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '₹${wallet.balance.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 36,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    wallet.currency,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              )
+            else
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '₹0.00',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 36,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  if (provider.walletError != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        provider.walletError!,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () {
+                setState(() {
+                  _selectedIndex = 2; // Navigate to wallet tab
+                });
+              },
+              icon: const Icon(Icons.arrow_forward),
+              label: const Text('View Transactions'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: AppTheme.primaryGreen,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              ),
+            ),
           ],
         ),
-        trailing: const Icon(Icons.chevron_right),
+      ),
+    );
+  }
+
+  Widget _buildQuickStatsRow(CustomerDashboardProvider provider) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth > 600;
+        return isWide
+            ? Row(
+                children: [
+                  Expanded(child: _buildStatCard('Active Orders', provider.recentOrders.where((o) => o.isActive).length.toString(), Icons.receipt_long, AppTheme.primaryGreen)),
+                  const SizedBox(width: 16),
+                  Expanded(child: _buildStatCard('Unread Notifications', provider.unreadCount.toString(), Icons.notifications, AppTheme.accentYellow)),
+                ],
+              )
+            : Column(
+                children: [
+                  _buildStatCard('Active Orders', provider.recentOrders.where((o) => o.isActive).length.toString(), Icons.receipt_long, AppTheme.primaryGreen),
+                  const SizedBox(height: 16),
+                  _buildStatCard('Unread Notifications', provider.unreadCount.toString(), Icons.notifications, AppTheme.accentYellow),
+                ],
+              );
+      },
+    );
+  }
+
+  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 24),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                    ),
+                  ),
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRecentOrdersSection(CustomerDashboardProvider provider) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Recent Orders',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _selectedIndex = 1; // Navigate to orders tab
+                });
+              },
+              child: const Text('View All'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (provider.isLoadingOrders)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(32.0),
+              child: CircularProgressIndicator(),
+            ),
+          )
+        else if (provider.recentOrders.isEmpty)
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                children: [
+                  Icon(Icons.receipt_long_outlined,
+                      size: 64, color: AppTheme.textMuted),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No orders yet',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: AppTheme.textSecondary,
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Your order history will appear here',
+                    style: TextStyle(color: AppTheme.textTertiary),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          )
+        else
+          ...provider.recentOrders.map((order) => _buildOrderCard(order)),
+      ],
+    );
+  }
+
+  Widget _buildOrderCard(OrderModel order) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: InkWell(
         onTap: () {
-          // TODO: Navigate to restaurant details
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Opening $name...')),
-          );
+          // TODO: Navigate to order details
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          order.orderNumber,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        if (order.vendor != null)
+                          Text(
+                            order.vendor!.name,
+                            style: TextStyle(
+                              color: AppTheme.textSecondary,
+                              fontSize: 14,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _getStatusColor(order.orderStatus).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      order.statusDisplay,
+                      style: TextStyle(
+                        color: _getStatusColor(order.orderStatus),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '₹${order.totalAmount.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      color: AppTheme.primaryGreen,
+                    ),
+                  ),
+                  Text(
+                    DateFormat('MMM dd, yyyy • hh:mm a')
+                        .format(order.orderPlacedAt),
+                    style: TextStyle(
+                      color: AppTheme.textTertiary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRecentNotificationsSection(CustomerDashboardProvider provider) {
+    final recentNotifications = provider.notifications.take(3).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Recent Notifications',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _selectedIndex = 3; // Navigate to notifications tab
+                });
+              },
+              child: const Text('View All'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (provider.isLoadingNotifications)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(32.0),
+              child: CircularProgressIndicator(),
+            ),
+          )
+        else if (recentNotifications.isEmpty)
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                children: [
+                  Icon(Icons.notifications_none,
+                      size: 64, color: AppTheme.textMuted),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No notifications',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: AppTheme.textSecondary,
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'You\'re all caught up!',
+                    style: TextStyle(color: AppTheme.textTertiary),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          )
+        else
+          ...recentNotifications.map((notification) =>
+              _buildNotificationCard(notification)),
+      ],
+    );
+  }
+
+  Widget _buildNotificationCard(NotificationModel notification) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      color: notification.isRead ? null : AppTheme.bgSectionGreen.withOpacity(0.3),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: _getNotificationColor(notification.type)
+              .withOpacity(0.1),
+          child: Icon(
+            _getNotificationIcon(notification.type),
+            color: _getNotificationColor(notification.type),
+          ),
+        ),
+        title: Text(
+          notification.title,
+          style: TextStyle(
+            fontWeight: notification.isRead ? FontWeight.normal : FontWeight.bold,
+          ),
+        ),
+        subtitle: Text(
+          notification.message,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        trailing: notification.isRead
+            ? null
+            : Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: AppTheme.primaryGreen,
+                  shape: BoxShape.circle,
+                ),
+              ),
+        onTap: () {
+          // TODO: Handle notification tap
         },
       ),
     );
   }
 
   Widget _buildOrdersTab() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.receipt_long_outlined, size: 64, color: AppTheme.textMuted),
-          const SizedBox(height: 16),
-          Text(
-            'No orders yet',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: AppTheme.textSecondary,
+    return Consumer<CustomerDashboardProvider>(
+      builder: (context, provider, _) {
+        return RefreshIndicator(
+          onRefresh: () => provider.loadRecentOrders(),
+          child: provider.isLoadingOrders
+              ? const Center(child: CircularProgressIndicator())
+              : provider.recentOrders.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.receipt_long_outlined,
+                              size: 64, color: AppTheme.textMuted),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No orders yet',
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                  color: AppTheme.textSecondary,
+                                ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Your order history will appear here',
+                            style: TextStyle(color: AppTheme.textTertiary),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: provider.recentOrders.length,
+                      itemBuilder: (context, index) {
+                        return _buildOrderCard(provider.recentOrders[index]);
+                      },
+                    ),
+        );
+      },
+    );
+  }
+
+  Widget _buildWalletTab() {
+    return Consumer<CustomerDashboardProvider>(
+      builder: (context, provider, _) {
+        // Load transactions when wallet tab is accessed
+        if (provider.walletTransactions.isEmpty && !provider.isLoadingWallet) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            provider.loadWalletTransactions();
+          });
+        }
+
+        return RefreshIndicator(
+          onRefresh: () async {
+            await provider.loadWalletBalance();
+            await provider.loadWalletTransactions();
+          },
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildWalletBalanceCard(provider),
+                const SizedBox(height: 24),
+                Text(
+                  'Recent Transactions',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
+                const SizedBox(height: 12),
+                if (provider.walletTransactions.isEmpty && !provider.isLoadingWallet)
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Column(
+                        children: [
+                          Icon(Icons.account_balance_wallet_outlined,
+                              size: 64, color: AppTheme.textMuted),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No transactions yet',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(
+                                  color: AppTheme.textSecondary,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else if (provider.isLoadingWallet && provider.walletTransactions.isEmpty)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(32.0),
+                      child: CircularProgressIndicator(),
+                    ),
+                  )
+                else
+                  ...provider.walletTransactions.map((transaction) =>
+                      _buildTransactionCard(transaction)),
+              ],
+            ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Your order history will appear here',
-            style: TextStyle(color: AppTheme.textTertiary),
+        );
+      },
+    );
+  }
+
+  Widget _buildTransactionCard(WalletTransactionModel transaction) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: transaction.isCredit
+              ? AppTheme.success.withOpacity(0.1)
+              : AppTheme.error.withOpacity(0.1),
+          child: Icon(
+            transaction.isCredit ? Icons.add : Icons.remove,
+            color: transaction.isCredit ? AppTheme.success : AppTheme.error,
           ),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: () {
-              setState(() {
-                _selectedIndex = 0;
-              });
-            },
-            child: const Text('Browse Restaurants'),
+        ),
+        title: Text(
+          transaction.description,
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+        subtitle: Text(
+          DateFormat('MMM dd, yyyy • hh:mm a').format(transaction.createdOn),
+          style: TextStyle(color: AppTheme.textTertiary, fontSize: 12),
+        ),
+        trailing: Text(
+          '${transaction.isCredit ? '+' : '-'}₹${transaction.amount.toStringAsFixed(2)}',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+            color: transaction.isCredit ? AppTheme.success : AppTheme.error,
           ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildCartTab() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.shopping_cart_outlined, size: 64, color: AppTheme.textMuted),
-          const SizedBox(height: 16),
-          Text(
-            'Your cart is empty',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: AppTheme.textSecondary,
+  Widget _buildNotificationsTab() {
+    return Consumer<CustomerDashboardProvider>(
+      builder: (context, provider, _) {
+        return Column(
+          children: [
+            if (provider.unreadCount > 0)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                color: AppTheme.bgSectionGreen,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '${provider.unreadCount} unread notification${provider.unreadCount > 1 ? 's' : ''}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.primaryGreen,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => provider.markAllNotificationsAsRead(),
+                      child: const Text('Mark all as read'),
+                    ),
+                  ],
                 ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Add items to your cart to continue',
-            style: TextStyle(color: AppTheme.textTertiary),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: () {
-              setState(() {
-                _selectedIndex = 0;
-              });
-            },
-            child: const Text('Start Shopping'),
-          ),
-        ],
-      ),
+              ),
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: () => provider.loadNotifications(),
+                child: provider.isLoadingNotifications
+                    ? const Center(child: CircularProgressIndicator())
+                    : provider.notifications.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.notifications_none,
+                                    size: 64, color: AppTheme.textMuted),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'No notifications',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleLarge
+                                      ?.copyWith(
+                                        color: AppTheme.textSecondary,
+                                      ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'You\'re all caught up!',
+                                  style: TextStyle(color: AppTheme.textTertiary),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.builder(
+                            padding: const EdgeInsets.all(16),
+                            itemCount: provider.notifications.length,
+                            itemBuilder: (context, index) {
+                              return _buildNotificationCard(
+                                  provider.notifications[index]);
+                            },
+                          ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -349,7 +935,6 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
       child: Column(
         children: [
           const SizedBox(height: 24),
-          // Profile Header
           CircleAvatar(
             radius: 50,
             backgroundColor: Theme.of(context).colorScheme.primary,
@@ -371,7 +956,6 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
             style: TextStyle(color: AppTheme.textSecondary),
           ),
           const SizedBox(height: 32),
-          // Menu Items
           _buildProfileMenuItem(
             Icons.person_outline,
             'Edit Profile',
@@ -406,10 +990,9 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
             Icons.wallet_outlined,
             'Wallet',
             () {
-              // TODO: Navigate to wallet
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Wallet feature coming soon')),
-              );
+              setState(() {
+                _selectedIndex = 2; // Navigate to wallet tab
+              });
             },
           ),
           _buildProfileMenuItem(
@@ -450,6 +1033,50 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
     );
   }
 
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return AppTheme.warning;
+      case 'confirmed':
+      case 'preparing':
+        return AppTheme.primaryGreen;
+      case 'out_for_delivery':
+        return AppTheme.accentYellow;
+      case 'delivered':
+        return AppTheme.success;
+      case 'cancelled':
+        return AppTheme.error;
+      default:
+        return AppTheme.textSecondary;
+    }
+  }
+
+  Color _getNotificationColor(String type) {
+    switch (type.toLowerCase()) {
+      case 'order':
+        return AppTheme.primaryGreen;
+      case 'promotion':
+        return AppTheme.accentYellow;
+      case 'payment':
+        return AppTheme.success;
+      default:
+        return AppTheme.textSecondary;
+    }
+  }
+
+  IconData _getNotificationIcon(String type) {
+    switch (type.toLowerCase()) {
+      case 'order':
+        return Icons.receipt_long;
+      case 'promotion':
+        return Icons.local_offer;
+      case 'payment':
+        return Icons.payment;
+      default:
+        return Icons.notifications;
+    }
+  }
+
   Future<void> _handleLogout(BuildContext context) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -472,6 +1099,9 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
     if (confirm == true) {
       if (!mounted) return;
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final dashboardProvider =
+          Provider.of<CustomerDashboardProvider>(context, listen: false);
+      dashboardProvider.clear();
       await authProvider.logout();
 
       if (!mounted) return;
@@ -482,4 +1112,3 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
     }
   }
 }
-

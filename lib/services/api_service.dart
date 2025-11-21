@@ -153,15 +153,19 @@ class ApiService {
 
   /// Get list of vendors
   Future<Map<String, dynamic>> getVendors({
+    bool? isFeatured,
     String? category,
     String? search,
+    double? minRating,
     int? page,
     int? pageSize,
   }) async {
     try {
       final queryParams = <String, dynamic>{};
+      if (isFeatured != null) queryParams['is_featured'] = isFeatured;
       if (category != null) queryParams['category'] = category;
       if (search != null) queryParams['search'] = search;
+      if (minRating != null) queryParams['min_rating'] = minRating;
       if (page != null) queryParams['page'] = page;
       if (pageSize != null) queryParams['page_size'] = pageSize;
 
@@ -172,6 +176,70 @@ class ApiService {
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {
       throw _handleError(e);
+    }
+  }
+
+  // ==================== Product Endpoints ====================
+
+  /// Get list of products
+  Future<Map<String, dynamic>> getProducts({
+    bool? isFeatured,
+    String? vendor,
+    String? category,
+    String? search,
+    double? minPrice,
+    double? maxPrice,
+    bool? isAvailable,
+    int? page,
+    int? pageSize,
+  }) async {
+    try {
+      final queryParams = <String, dynamic>{};
+      if (isFeatured != null) queryParams['is_featured'] = isFeatured;
+      if (vendor != null) queryParams['vendor'] = vendor;
+      if (category != null) queryParams['category'] = category;
+      if (search != null) queryParams['search'] = search;
+      if (minPrice != null) queryParams['min_price'] = minPrice;
+      if (maxPrice != null) queryParams['max_price'] = maxPrice;
+      if (isAvailable != null) queryParams['is_available'] = isAvailable;
+      if (page != null) queryParams['page'] = page;
+      if (pageSize != null) queryParams['page_size'] = pageSize;
+
+      final response = await _dio.get(
+        AppConfig.productsEndpoint,
+        queryParameters: queryParams.isEmpty ? null : queryParams,
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// Get product categories
+  Future<List<dynamic>> getProductCategories() async {
+    try {
+      final response = await _dio.get('/product-categories/');
+      if (response.data is List) {
+        return response.data as List<dynamic>;
+      }
+      return [];
+    } on DioException catch (e) {
+      _handleError(e);
+      return [];
+    }
+  }
+
+  /// Get vendor categories
+  Future<List<dynamic>> getVendorCategories() async {
+    try {
+      final response = await _dio.get('/vendor-categories/');
+      if (response.data is List) {
+        return response.data as List<dynamic>;
+      }
+      return [];
+    } on DioException catch (e) {
+      _handleError(e);
+      return [];
     }
   }
 
@@ -195,6 +263,127 @@ class ApiService {
   Future<Map<String, dynamic>> getDeliveryDashboard() async {
     try {
       final response = await _dio.get('${AppConfig.deliveryEndpoint}/dashboard/');
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  // ==================== Customer Dashboard Endpoints ====================
+
+  /// Get home data (featured vendors, categories, promotions, popular products)
+  /// 
+  /// [latitude] - Optional user latitude
+  /// [longitude] - Optional user longitude
+  Future<Map<String, dynamic>> getHomeData({
+    double? latitude,
+    double? longitude,
+  }) async {
+    try {
+      final queryParams = <String, dynamic>{};
+      if (latitude != null) queryParams['latitude'] = latitude;
+      if (longitude != null) queryParams['longitude'] = longitude;
+
+      final response = await _dio.get(
+        '/home-data/',
+        queryParameters: queryParams.isEmpty ? null : queryParams,
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// Get wallet balance
+  /// 
+  /// Returns wallet information with current balance
+  Future<Map<String, dynamic>> getWalletBalance() async {
+    try {
+      final response = await _dio.get('${AppConfig.walletEndpoint}/');
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// Get wallet transactions
+  /// 
+  /// [page] - Page number for pagination
+  /// [pageSize] - Number of items per page
+  Future<Map<String, dynamic>> getWalletTransactions({
+    int? page,
+    int? pageSize,
+  }) async {
+    try {
+      final queryParams = <String, dynamic>{};
+      if (page != null) queryParams['page'] = page;
+      if (pageSize != null) queryParams['page_size'] = pageSize;
+
+      final response = await _dio.get(
+        '${AppConfig.walletEndpoint}/transactions/',
+        queryParameters: queryParams.isEmpty ? null : queryParams,
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// Get notifications
+  /// 
+  /// [page] - Page number for pagination
+  /// [isRead] - Filter by read status (optional)
+  Future<Map<String, dynamic>> getNotifications({
+    int? page,
+    bool? isRead,
+  }) async {
+    try {
+      final queryParams = <String, dynamic>{};
+      if (page != null) queryParams['page'] = page;
+      if (isRead != null) queryParams['is_read'] = isRead;
+
+      final response = await _dio.get(
+        AppConfig.notificationsEndpoint,
+        queryParameters: queryParams.isEmpty ? null : queryParams,
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// Mark all notifications as read
+  Future<Map<String, dynamic>> markAllNotificationsAsRead() async {
+    try {
+      final response = await _dio.post(
+        '${AppConfig.notificationsEndpoint}/mark-all-read/',
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// Get customer orders
+  /// 
+  /// [status] - Filter by order status
+  /// [page] - Page number for pagination
+  /// [pageSize] - Number of items per page
+  Future<Map<String, dynamic>> getOrders({
+    String? status,
+    int? page,
+    int? pageSize,
+  }) async {
+    try {
+      final queryParams = <String, dynamic>{};
+      if (status != null) queryParams['status'] = status;
+      if (page != null) queryParams['page'] = page;
+      if (pageSize != null) queryParams['page_size'] = pageSize;
+
+      final response = await _dio.get(
+        AppConfig.ordersEndpoint,
+        queryParameters: queryParams.isEmpty ? null : queryParams,
+      );
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {
       throw _handleError(e);
@@ -237,11 +426,13 @@ class ApiService {
       }
     } else if (error.type == DioExceptionType.connectionTimeout ||
         error.type == DioExceptionType.receiveTimeout) {
-      return 'Connection timeout. Please check your internet connection.';
+      return 'Connection timeout. The server is taking too long to respond. Please check your internet connection and try again.';
     } else if (error.type == DioExceptionType.connectionError) {
-      return 'No internet connection. Please check your network.';
+      return 'No internet connection. Please check your network settings and try again.';
+    } else if (error.type == DioExceptionType.sendTimeout) {
+      return 'Request timeout. Please check your connection and try again.';
     } else {
-      return 'An unexpected error occurred: ${error.message}';
+      return 'An unexpected error occurred: ${error.message ?? 'Unknown error'}';
     }
   }
 }

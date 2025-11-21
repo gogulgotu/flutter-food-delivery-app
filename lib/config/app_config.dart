@@ -30,9 +30,9 @@ class AppConfig {
   static const String deliveryEndpoint = '/delivery';
   static const String dashboardEndpoint = '/dashboard';
 
-  // Timeouts
-  static const Duration connectTimeout = Duration(seconds: 30);
-  static const Duration receiveTimeout = Duration(seconds: 30);
+  // Timeouts - Increased for better reliability
+  static const Duration connectTimeout = Duration(seconds: 60);
+  static const Duration receiveTimeout = Duration(seconds: 60);
 
   // OTP Configuration
   static const int otpLength = 6;

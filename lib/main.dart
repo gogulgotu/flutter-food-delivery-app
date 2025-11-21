@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
+import 'providers/customer_dashboard_provider.dart';
+import 'providers/catalog_provider.dart';
 import 'screens/splash_screen.dart';
 import 'theme/app_theme.dart';
 
@@ -16,6 +18,8 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => CustomerDashboardProvider()),
+        ChangeNotifierProvider(create: (_) => CatalogProvider()),
       ],
       child: MaterialApp(
         title: 'Food Delivery App',
