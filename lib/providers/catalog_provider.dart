@@ -1,14 +1,24 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../models/vendor_model.dart';
 import '../models/product_model.dart';
 import '../models/vendor_category_model.dart';
 import '../services/api_service.dart';
+import '../utils/error_utils.dart';
 
 /// Catalog Provider
 /// 
 /// Manages state for vendors and products catalog
 class CatalogProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
+
+  // Request management
+  Timer? _debounceTimer;
+  DateTime? _lastVendorsFetch;
+  DateTime? _lastProductsFetch;
+  static const Duration _cacheDuration = Duration(minutes: 5);
+  static const Duration _minRequestInterval = Duration(seconds: 2);
+  bool _isRequestInProgress = false;
 
   // Vendors
   List<VendorModel> _vendors = [];
@@ -62,12 +72,25 @@ class CatalogProvider with ChangeNotifier {
 
   /// Load all catalog data
   Future<void> loadCatalog() async {
-    await Future.wait([
-      loadCategories(),
-      loadVendorCategories(),
-      loadVendors(reset: true),
-      loadProducts(reset: true),
-    ]);
+    // Prevent concurrent requests
+    if (_isRequestInProgress) return;
+    _isRequestInProgress = true;
+
+    try {
+      // Load categories first (usually faster)
+      await loadCategories();
+      await loadVendorCategories();
+      
+      // Add small delay between requests to avoid throttling
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      // Load vendors and products with delay
+      await loadVendors(reset: true);
+      await Future.delayed(const Duration(milliseconds: 500));
+      await loadProducts(reset: true);
+    } finally {
+      _isRequestInProgress = false;
+    }
   }
 
   /// Load vendors
@@ -79,6 +102,24 @@ class CatalogProvider with ChangeNotifier {
     }
 
     if (!_hasMoreVendors || _isLoadingVendors) return;
+
+    // Check cache - use cached data if available and recent
+    if (!reset && _lastVendorsFetch != null && _vendors.isNotEmpty) {
+      final timeSinceLastFetch = DateTime.now().difference(_lastVendorsFetch!);
+      if (timeSinceLastFetch < _cacheDuration) {
+        // Use cached data, no need to fetch
+        return;
+      }
+    }
+
+    // Prevent too frequent requests
+    if (_lastVendorsFetch != null && !reset) {
+      final timeSinceLastFetch = DateTime.now().difference(_lastVendorsFetch!);
+      if (timeSinceLastFetch < _minRequestInterval) {
+        // Wait before making request
+        await Future.delayed(_minRequestInterval - timeSinceLastFetch);
+      }
+    }
 
     _isLoadingVendors = true;
     _vendorsError = null;
@@ -93,9 +134,17 @@ class CatalogProvider with ChangeNotifier {
         pageSize: _vendorsPageSize,
       );
 
-      final results = (data['results'] as List)
-          .map((json) => VendorModel.fromJson(json))
-          .toList();
+      final results = <VendorModel>[];
+      for (var json in data['results'] as List) {
+        try {
+          results.add(VendorModel.fromJson(json as Map<String, dynamic>));
+        } catch (e) {
+          // Log parsing error but continue with other vendors
+          debugPrint('Error parsing vendor: $e');
+          debugPrint('Vendor JSON: $json');
+          // Continue to next vendor instead of failing entire request
+        }
+      }
 
       if (reset) {
         _vendors = results;
@@ -106,10 +155,20 @@ class CatalogProvider with ChangeNotifier {
       _hasMoreVendors = data['next'] != null;
       _vendorsPage++;
       _vendorsError = null;
+      _lastVendorsFetch = DateTime.now(); // Update cache timestamp
     } catch (e) {
       // Extract user-friendly error message
       String errorMessage = e.toString();
-      if (errorMessage.contains('Connection timeout') || 
+      
+      // Remove "Exception: " prefix if present
+      if (errorMessage.startsWith('Exception: ')) {
+        errorMessage = errorMessage.substring(11);
+      }
+      
+      // Handle throttling/rate limiting errors
+      if (ErrorUtils.isThrottlingError(errorMessage)) {
+        errorMessage = ErrorUtils.formatThrottlingError(errorMessage);
+      } else if (errorMessage.contains('Connection timeout') || 
           errorMessage.contains('connectionTimeout')) {
         errorMessage = 'Connection timeout. Please check your internet connection and try again.';
       } else if (errorMessage.contains('No internet') || 
@@ -119,6 +178,7 @@ class CatalogProvider with ChangeNotifier {
                  errorMessage.contains('SocketException')) {
         errorMessage = 'Cannot connect to server. Please check your internet connection.';
       }
+      
       _vendorsError = errorMessage;
       if (reset) {
         _vendors = [];
@@ -139,6 +199,24 @@ class CatalogProvider with ChangeNotifier {
 
     if (!_hasMoreProducts || _isLoadingProducts) return;
 
+    // Check cache - use cached data if available and recent
+    if (!reset && _lastProductsFetch != null && _products.isNotEmpty) {
+      final timeSinceLastFetch = DateTime.now().difference(_lastProductsFetch!);
+      if (timeSinceLastFetch < _cacheDuration) {
+        // Use cached data, no need to fetch
+        return;
+      }
+    }
+
+    // Prevent too frequent requests
+    if (_lastProductsFetch != null && !reset) {
+      final timeSinceLastFetch = DateTime.now().difference(_lastProductsFetch!);
+      if (timeSinceLastFetch < _minRequestInterval) {
+        // Wait before making request
+        await Future.delayed(_minRequestInterval - timeSinceLastFetch);
+      }
+    }
+
     _isLoadingProducts = true;
     _productsError = null;
     notifyListeners();
@@ -152,9 +230,17 @@ class CatalogProvider with ChangeNotifier {
         pageSize: _productsPageSize,
       );
 
-      final results = (data['results'] as List)
-          .map((json) => ProductModel.fromJson(json))
-          .toList();
+      final results = <ProductModel>[];
+      for (var json in data['results'] as List) {
+        try {
+          results.add(ProductModel.fromJson(json as Map<String, dynamic>));
+        } catch (e) {
+          // Log parsing error but continue with other products
+          debugPrint('Error parsing product: $e');
+          debugPrint('Product JSON: $json');
+          // Continue to next product instead of failing entire request
+        }
+      }
 
       if (reset) {
         _products = results;
@@ -165,10 +251,20 @@ class CatalogProvider with ChangeNotifier {
       _hasMoreProducts = data['next'] != null;
       _productsPage++;
       _productsError = null;
+      _lastProductsFetch = DateTime.now(); // Update cache timestamp
     } catch (e) {
       // Extract user-friendly error message
       String errorMessage = e.toString();
-      if (errorMessage.contains('Connection timeout') || 
+      
+      // Remove "Exception: " prefix if present
+      if (errorMessage.startsWith('Exception: ')) {
+        errorMessage = errorMessage.substring(11);
+      }
+      
+      // Handle throttling/rate limiting errors
+      if (ErrorUtils.isThrottlingError(errorMessage)) {
+        errorMessage = ErrorUtils.formatThrottlingError(errorMessage);
+      } else if (errorMessage.contains('Connection timeout') || 
           errorMessage.contains('connectionTimeout')) {
         errorMessage = 'Connection timeout. Please check your internet connection and try again.';
       } else if (errorMessage.contains('No internet') || 
@@ -178,6 +274,7 @@ class CatalogProvider with ChangeNotifier {
                  errorMessage.contains('SocketException')) {
         errorMessage = 'Cannot connect to server. Please check your internet connection.';
       }
+      
       _productsError = errorMessage;
       if (reset) {
         _products = [];
@@ -226,16 +323,28 @@ class CatalogProvider with ChangeNotifier {
   void setCategory(String? category) {
     if (_selectedCategory == category) return;
     _selectedCategory = category;
-    loadVendors(reset: true);
-    loadProducts(reset: true);
+    
+    // Add small delay to prevent rapid requests
+    Future.delayed(const Duration(milliseconds: 300), () {
+      loadVendors(reset: true);
+      loadProducts(reset: true);
+    });
   }
 
-  /// Set search query
+  /// Set search query with debouncing
   void setSearchQuery(String? query) {
     if (_searchQuery == query) return;
+    
+    // Cancel previous debounce timer
+    _debounceTimer?.cancel();
+    
     _searchQuery = query;
-    loadVendors(reset: true);
-    loadProducts(reset: true);
+    
+    // Debounce search - wait 800ms before making request
+    _debounceTimer = Timer(const Duration(milliseconds: 800), () {
+      loadVendors(reset: true);
+      loadProducts(reset: true);
+    });
   }
 
   /// Toggle featured filter
@@ -256,7 +365,16 @@ class CatalogProvider with ChangeNotifier {
 
   /// Refresh all data
   Future<void> refresh() async {
+    // Clear cache timestamps to force refresh
+    _lastVendorsFetch = null;
+    _lastProductsFetch = null;
     await loadCatalog();
+  }
+
+  @override
+  void dispose() {
+    _debounceTimer?.cancel();
+    super.dispose();
   }
 }
 

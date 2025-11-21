@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
@@ -25,24 +26,37 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _initializeApp() async {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    
-    // Initialize auth state from storage
-    await authProvider.initialize();
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      
+      // Initialize auth state from storage
+      await authProvider.initialize();
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    // Wait a bit for splash screen visibility
-    await Future.delayed(const Duration(seconds: 2));
+      // Wait a bit for splash screen visibility
+      await Future.delayed(const Duration(seconds: 2));
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    // Navigate based on authentication status
-    if (authProvider.isAuthenticated && authProvider.user != null) {
-      // User is logged in, navigate to appropriate dashboard
-      _navigateToDashboard(authProvider.user!.role);
-    } else {
-      // User is not logged in, navigate to login
+      // Navigate based on authentication status
+      if (authProvider.isAuthenticated && authProvider.user != null) {
+        // User is logged in, navigate to appropriate dashboard
+        _navigateToDashboard(authProvider.user!.role);
+      } else {
+        // User is not logged in, navigate to login
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => const PhoneNumberScreen()),
+        );
+      }
+    } catch (e, stackTrace) {
+      // Log error and navigate to login screen as fallback
+      debugPrint('Error initializing app: $e');
+      debugPrint('Stack trace: $stackTrace');
+      
+      if (!mounted) return;
+      
+      // Navigate to login screen on error
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => const PhoneNumberScreen()),
       );

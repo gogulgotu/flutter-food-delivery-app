@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 /// Vendor Model
 /// 
 /// Represents a vendor (restaurant/hotel) in the system
@@ -29,17 +31,58 @@ class VendorModel {
   });
 
   factory VendorModel.fromJson(Map<String, dynamic> json) {
+    // Extract image - try multiple possible fields
+    String? imageUrl;
+    
+    // Try cover_image_url first (most common for vendor cards)
+    imageUrl = json['cover_image_url'] as String?;
+    
+    // Fallback to cover_image
+    if (imageUrl == null || imageUrl.isEmpty) {
+      imageUrl = json['cover_image'] as String?;
+    }
+    
+    // Fallback to logo_url
+    if (imageUrl == null || imageUrl.isEmpty) {
+      imageUrl = json['logo_url'] as String?;
+    }
+    
+    // Fallback to logo
+    if (imageUrl == null || imageUrl.isEmpty) {
+      imageUrl = json['logo'] as String?;
+    }
+    
+    // Fallback to direct image field
+    if (imageUrl == null || imageUrl.isEmpty) {
+      imageUrl = json['image'] as String?;
+    }
+    
+    // Clean the URL - remove any newlines, carriage returns, or extra whitespace
+    if (imageUrl != null) {
+      imageUrl = imageUrl.replaceAll(RegExp(r'[\n\r\t\s]+'), '').trim();
+    }
+    
+    // Debug: Log image URL for troubleshooting
+    if (imageUrl != null) {
+      debugPrint('VendorModel: Image URL from API: $imageUrl');
+    } else {
+      debugPrint('VendorModel: No image URL found in: ${json.keys.toList()}');
+    }
+    
     return VendorModel(
       id: json['id'] as String,
       name: json['name'] as String,
       slug: json['slug'] as String,
       description: json['description'] as String?,
       rating: _parseDouble(json['rating']),
-      deliveryTime: _parseInt(json['delivery_time']),
-      deliveryFee: _parseDouble(json['delivery_fee']),
-      minimumOrder: _parseDouble(json['minimum_order']),
+      deliveryTime: _parseInt(json['delivery_time']) ?? 
+                    _parseInt(json['delivery_time_min']),
+      deliveryFee: _parseDouble(json['delivery_fee']) ?? 
+                   _parseDouble(json['delivery_fee_amount']),
+      minimumOrder: _parseDouble(json['minimum_order']) ?? 
+                    _parseDouble(json['minimum_order_amount']),
       isActive: json['is_active'] as bool? ?? true,
-      image: json['image'] as String?,
+      image: imageUrl,
       cuisineTypes: json['cuisine_types'] != null
           ? List<String>.from(json['cuisine_types'] as List)
           : null,

@@ -16,6 +16,16 @@ class AppConfig {
   // Get the appropriate base URL based on environment
   static String get baseUrl => isDevelopment ? devBaseUrl : prodBaseUrl;
 
+  // Media URL - Django serves media files from root/media/
+  // Remove /api from base URL to get the root URL
+  static String get mediaBaseUrl {
+    if (isDevelopment) {
+      return 'http://localhost:8000';
+    } else {
+      return 'https://react-app-dot-inspired-micron-474510-a3.uc.r.appspot.com';
+    }
+  }
+
   // API Endpoints
   static const String authEndpoint = '/auth';
   static const String usersEndpoint = '/users';

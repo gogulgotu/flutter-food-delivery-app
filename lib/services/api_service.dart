@@ -179,6 +179,16 @@ class ApiService {
     }
   }
 
+  /// Get vendor details by slug
+  Future<Map<String, dynamic>> getVendorDetails(String slug) async {
+    try {
+      final response = await _dio.get('${AppConfig.vendorsEndpoint}/$slug/');
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
   // ==================== Product Endpoints ====================
 
   /// Get list of products
@@ -419,6 +429,16 @@ class ApiService {
           return 'Forbidden. You do not have permission.';
         case 404:
           return 'Resource not found.';
+        case 429:
+          // Rate limiting / Throttling
+          if (data is Map<String, dynamic>) {
+            if (data.containsKey('detail')) {
+              return data['detail'] as String;
+            } else if (data.containsKey('message')) {
+              return data['message'] as String;
+            }
+          }
+          return 'Request was throttled. Please try again later.';
         case 500:
           return 'Server error. Please try again later.';
         default:
