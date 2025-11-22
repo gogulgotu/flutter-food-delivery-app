@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '../config/app_config.dart';
 import '../models/auth_response_model.dart';
 import '../services/storage_service.dart';
@@ -225,16 +226,60 @@ class ApiService {
     }
   }
 
+  /// Get product details by slug
+  Future<Map<String, dynamic>> getProductDetails(String slug) async {
+    try {
+      final response = await _dio.get('${AppConfig.productsEndpoint}/$slug/');
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
   /// Get product categories
   Future<List<dynamic>> getProductCategories() async {
     try {
+      debugPrint('🟢 Fetching product categories from: /product-categories/');
       final response = await _dio.get('/product-categories/');
-      if (response.data is List) {
-        return response.data as List<dynamic>;
+      debugPrint('🟢 Product categories response status: ${response.statusCode}');
+      debugPrint('🟢 Product categories response type: ${response.data.runtimeType}');
+      
+      // Handle paginated response (if API returns {results: [...]})
+      if (response.data is Map<String, dynamic>) {
+        final data = response.data as Map<String, dynamic>;
+        debugPrint('🟢 Product categories: Map response with keys: ${data.keys.toList()}');
+        if (data.containsKey('results') && data['results'] is List) {
+          final results = data['results'] as List;
+          debugPrint('✅ Product categories: Paginated response with ${results.length} items');
+          return results;
+        } else if (data.containsKey('data') && data['data'] is List) {
+          final results = data['data'] as List;
+          debugPrint('✅ Product categories: Data key response with ${results.length} items');
+          return results;
+        } else {
+          debugPrint('⚠️ Product categories: Map response but no results/data key found');
+          debugPrint('   Map content: $data');
+        }
       }
+      
+      // Handle direct list response
+      if (response.data is List) {
+        final list = response.data as List;
+        debugPrint('✅ Product categories: Direct list response with ${list.length} items');
+        return list;
+      }
+      
+      debugPrint('❌ Product categories: Unexpected response format: ${response.data.runtimeType}');
+      debugPrint('   Response data: ${response.data}');
       return [];
     } on DioException catch (e) {
-      _handleError(e);
+      final error = _handleError(e);
+      debugPrint('❌ Error fetching product categories: $error');
+      debugPrint('   Status code: ${e.response?.statusCode}');
+      debugPrint('   Response data: ${e.response?.data}');
+      return [];
+    } catch (e) {
+      debugPrint('❌ Unexpected error fetching product categories: $e');
       return [];
     }
   }
@@ -242,13 +287,47 @@ class ApiService {
   /// Get vendor categories
   Future<List<dynamic>> getVendorCategories() async {
     try {
+      debugPrint('🔵 Fetching vendor categories from: /vendor-categories/');
       final response = await _dio.get('/vendor-categories/');
-      if (response.data is List) {
-        return response.data as List<dynamic>;
+      debugPrint('🔵 Vendor categories response status: ${response.statusCode}');
+      debugPrint('🔵 Vendor categories response type: ${response.data.runtimeType}');
+      
+      // Handle paginated response (if API returns {results: [...]})
+      if (response.data is Map<String, dynamic>) {
+        final data = response.data as Map<String, dynamic>;
+        debugPrint('🔵 Vendor categories: Map response with keys: ${data.keys.toList()}');
+        if (data.containsKey('results') && data['results'] is List) {
+          final results = data['results'] as List;
+          debugPrint('✅ Vendor categories: Paginated response with ${results.length} items');
+          return results;
+        } else if (data.containsKey('data') && data['data'] is List) {
+          final results = data['data'] as List;
+          debugPrint('✅ Vendor categories: Data key response with ${results.length} items');
+          return results;
+        } else {
+          debugPrint('⚠️ Vendor categories: Map response but no results/data key found');
+          debugPrint('   Map content: $data');
+        }
       }
+      
+      // Handle direct list response
+      if (response.data is List) {
+        final list = response.data as List;
+        debugPrint('✅ Vendor categories: Direct list response with ${list.length} items');
+        return list;
+      }
+      
+      debugPrint('❌ Vendor categories: Unexpected response format: ${response.data.runtimeType}');
+      debugPrint('   Response data: ${response.data}');
       return [];
     } on DioException catch (e) {
-      _handleError(e);
+      final error = _handleError(e);
+      debugPrint('❌ Error fetching vendor categories: $error');
+      debugPrint('   Status code: ${e.response?.statusCode}');
+      debugPrint('   Response data: ${e.response?.data}');
+      return [];
+    } catch (e) {
+      debugPrint('❌ Unexpected error fetching vendor categories: $e');
       return [];
     }
   }
@@ -395,6 +474,81 @@ class ApiService {
         queryParameters: queryParams.isEmpty ? null : queryParams,
       );
       return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  // ==================== Cart Endpoints ====================
+
+  /// Get user's cart for a vendor
+  Future<Map<String, dynamic>> getCart(String vendorId) async {
+    try {
+      debugPrint('🟢 Fetching cart from: ${AppConfig.cartEndpoint}?vendor=$vendorId');
+      final response = await _dio.get(
+        AppConfig.cartEndpoint,
+        queryParameters: {'vendor': vendorId},
+      );
+      debugPrint('🟢 Cart response status: ${response.statusCode}');
+      debugPrint('🟢 Cart raw response: ${response.data}');
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      final error = _handleError(e);
+      debugPrint('❌ Error fetching cart: $error');
+      throw error;
+    }
+  }
+
+  /// Add item to cart
+  Future<Map<String, dynamic>> addToCart({
+    required String productId,
+    required int quantity,
+    String? variantId,
+  }) async {
+    try {
+      final data = <String, dynamic>{
+        'product': productId,
+        'quantity': quantity,
+      };
+      if (variantId != null) {
+        data['variant'] = variantId;
+      }
+
+      debugPrint('🟢 Adding to cart: ${AppConfig.cartEndpoint}/items/ with data: $data');
+      final response = await _dio.post(
+        '${AppConfig.cartEndpoint}/items/',
+        data: data,
+      );
+      debugPrint('🟢 Add to cart response status: ${response.statusCode}');
+      debugPrint('🟢 Add to cart response: ${response.data}');
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      final error = _handleError(e);
+      debugPrint('❌ Error adding to cart: $error');
+      throw error;
+    }
+  }
+
+  /// Update cart item quantity
+  Future<Map<String, dynamic>> updateCartItem({
+    required int itemId,
+    required int quantity,
+  }) async {
+    try {
+      final response = await _dio.patch(
+        '${AppConfig.cartEndpoint}/items/$itemId/',
+        data: {'quantity': quantity},
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// Remove item from cart
+  Future<void> removeFromCart(int itemId) async {
+    try {
+      await _dio.delete('${AppConfig.cartEndpoint}/items/$itemId/delete/');
     } on DioException catch (e) {
       throw _handleError(e);
     }

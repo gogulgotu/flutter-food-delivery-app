@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../providers/catalog_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/customer_dashboard_provider.dart';
+import '../../providers/cart_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../models/vendor_model.dart';
 import '../../models/product_model.dart';
@@ -11,6 +12,7 @@ import '../../models/vendor_category_model.dart';
 import '../../utils/image_utils.dart';
 import '../../utils/error_utils.dart';
 import 'restaurant_details_screen.dart';
+import 'cart_screen.dart';
 
 /// Customer Home Screen
 /// 
@@ -25,7 +27,6 @@ class CustomerHomeScreen extends StatefulWidget {
 class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   final ScrollController _scrollController = ScrollController();
   String? _selectedLocation = 'Home';
-  String? _selectedFilter;
 
   @override
   void initState() {
@@ -74,9 +75,6 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                 
                 // Browse by Category Section
                 _buildCategorySection(),
-                
-                // Filter Section
-                _buildFilterSection(),
                 
                 const SizedBox(height: 24),
                 
@@ -247,6 +245,69 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
             ),
           ),
           const SizedBox(width: 12),
+          // Cart Icon with Badge
+          Consumer<CartProvider>(
+            builder: (context, cartProvider, _) {
+              final itemCount = cartProvider.itemCount;
+              return GestureDetector(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const CartScreen(),
+                    ),
+                  );
+                },
+                child: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: AppTheme.bgLightGray,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Stack(
+                    children: [
+                      Center(
+                        child: Icon(
+                          Icons.shopping_cart_outlined,
+                          size: 24,
+                          color: AppTheme.primaryGreen,
+                        ),
+                      ),
+                      if (itemCount > 0)
+                        Positioned(
+                          right: 8,
+                          top: 8,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: AppTheme.error,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 1.5),
+                            ),
+                            constraints: const BoxConstraints(
+                              minWidth: 18,
+                              minHeight: 18,
+                            ),
+                            child: Center(
+                              child: Text(
+                                itemCount > 99 ? '99+' : itemCount.toString(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  height: 1.0,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(width: 12),
           // Wallet Icon
           Consumer<CustomerDashboardProvider>(
             builder: (context, provider, _) {
@@ -311,85 +372,134 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   }
 
   Widget _buildCategorySection() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isTablet = screenWidth >= 768;
+    final isDesktop = screenWidth >= 1024;
+    
     return Consumer<CatalogProvider>(
       builder: (context, provider, _) {
         // Use vendor categories if available, otherwise use product categories
         final vendorCategories = provider.vendorCategories;
         final productCategories = provider.productCategories;
         final hasCategories = vendorCategories.isNotEmpty || productCategories.isNotEmpty;
-        
-        if (provider.isLoadingCategories && !hasCategories) {
-          return const Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Center(child: CircularProgressIndicator()),
-          );
-        }
 
-        if (!hasCategories) {
-          return const SizedBox.shrink();
-        }
+        // Debug logging
+        debugPrint('📊 Category Section Build:');
+        debugPrint('   Vendor categories: ${vendorCategories.length}');
+        debugPrint('   Product categories: ${productCategories.length}');
+        debugPrint('   Has categories: $hasCategories');
+        debugPrint('   Is loading: ${provider.isLoadingCategories}');
+        debugPrint('   Selected category: ${provider.selectedCategory}');
 
         // Combine categories - prefer vendor categories
         final categories = vendorCategories.isNotEmpty 
             ? vendorCategories 
             : productCategories;
-        final categoryCount = categories.length;
+
+        // Adaptive sizing based on screen size
+        final itemWidth = isDesktop ? 90.0 : isTablet ? 85.0 : 80.0;
+        final iconSize = isDesktop ? 65.0 : isTablet ? 60.0 : 55.0;
+        final fontSize = isDesktop ? 13.0 : isTablet ? 12.5 : 12.0;
+
+        // Always show the category section with at least "All" option
+        // Show loading indicator if categories are loading and none exist yet
+        final itemCount = hasCategories ? categories.length + 1 : 1; // +1 for "All" option
+        
+        debugPrint('   Item count: $itemCount (1 for "All" + ${categories.length} categories)');
 
         return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Browse by Category',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                height: 100,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: categoryCount,
-                  itemBuilder: (context, index) {
-                    if (vendorCategories.isNotEmpty) {
-                      final category = vendorCategories[index];
-                      final isSelected = provider.selectedCategory == category.id;
-                      
-                      return _buildCategoryItem(
-                        category.name,
-                        category.icon,
-                        isSelected,
-                        () {
-                          if (isSelected) {
+          padding: EdgeInsets.symmetric(
+            horizontal: isDesktop ? 32 : isTablet ? 24 : 16,
+            vertical: isDesktop ? 20 : isTablet ? 16 : 12,
+          ),
+          child: SizedBox(
+            height: isDesktop ? 110 : isTablet ? 105 : 100,
+            child: provider.isLoadingCategories && !hasCategories
+                ? const Center(child: CircularProgressIndicator())
+                : ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    itemCount: itemCount,
+                    itemBuilder: (context, index) {
+                      // First item is always "All"
+                      if (index == 0) {
+                        final isSelected = provider.selectedCategory == null;
+                        return _buildCategoryItem(
+                          'All',
+                          null,
+                          isSelected,
+                          itemWidth,
+                          iconSize,
+                          fontSize,
+                          () {
                             provider.setCategory(null);
-                          } else {
-                            provider.setCategory(category.id);
-                          }
-                        },
-                      );
-                    } else {
-                      final category = productCategories[index];
-                      final isSelected = provider.selectedCategory == category.id;
+                          },
+                        );
+                      }
                       
-                      return _buildCategoryItem(
-                        category.name,
-                        category.icon,
-                        isSelected,
-                        () {
-                          if (isSelected) {
-                            provider.setCategory(null);
-                          } else {
-                            provider.setCategory(category.id);
-                          }
-                        },
-                      );
-                    }
-                  },
-                ),
-              ),
-            ],
+                      // Other categories from API
+                      if (!hasCategories || categories.isEmpty) {
+                        debugPrint('⚠️ No categories available for index $index');
+                        return const SizedBox.shrink();
+                      }
+                      
+                      final categoryIndex = index - 1;
+                      if (categoryIndex >= categories.length) {
+                        debugPrint('⚠️ Category index $categoryIndex is out of bounds (length: ${categories.length})');
+                        return const SizedBox.shrink();
+                      }
+                      
+                      // Handle vendor categories
+                      if (vendorCategories.isNotEmpty && categoryIndex < vendorCategories.length) {
+                        final category = vendorCategories[categoryIndex];
+                        final isSelected = provider.selectedCategory == category.id;
+                        
+                        debugPrint('✅ Building vendor category item: ${category.name} (index: $categoryIndex)');
+                        
+                        return _buildCategoryItem(
+                          category.name,
+                          category.icon ?? category.image,
+                          isSelected,
+                          itemWidth,
+                          iconSize,
+                          fontSize,
+                          () {
+                            if (isSelected) {
+                              provider.setCategory(null);
+                            } else {
+                              provider.setCategory(category.id);
+                            }
+                          },
+                        );
+                      } 
+                      // Handle product categories
+                      else if (productCategories.isNotEmpty && categoryIndex < productCategories.length) {
+                        final category = productCategories[categoryIndex];
+                        final isSelected = provider.selectedCategory == category.id;
+                        
+                        debugPrint('✅ Building product category item: ${category.name} (index: $categoryIndex)');
+                        
+                        return _buildCategoryItem(
+                          category.name,
+                          category.icon ?? category.image,
+                          isSelected,
+                          itemWidth,
+                          iconSize,
+                          fontSize,
+                          () {
+                            if (isSelected) {
+                              provider.setCategory(null);
+                            } else {
+                              provider.setCategory(category.id);
+                            }
+                          },
+                        );
+                      }
+                      
+                      debugPrint('❌ No category found for index $index (categoryIndex: $categoryIndex)');
+                      return const SizedBox.shrink();
+                    },
+                  ),
           ),
         );
       },
@@ -400,78 +510,94 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     String name,
     String? iconUrl,
     bool isSelected,
+    double itemWidth,
+    double iconSize,
+    double fontSize,
     VoidCallback onTap,
   ) {
+    // Use green for "All" category, red for others
+    final isAllCategory = name.toLowerCase() == 'all';
+    final selectedColor = isAllCategory ? AppTheme.primaryGreen : AppTheme.error;
+    
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 80,
+        width: itemWidth,
         margin: const EdgeInsets.only(right: 12),
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            // Circular icon container
             Container(
-              width: 60,
-              height: 60,
+              width: iconSize,
+              height: iconSize,
               decoration: BoxDecoration(
                 color: isSelected
-                    ? AppTheme.primaryGreen
-                    : AppTheme.primaryGreenLight.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(12),
+                    ? selectedColor.withOpacity(0.1)
+                    : AppTheme.bgLightGray,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isSelected
+                      ? selectedColor
+                      : Colors.transparent,
+                  width: 2,
+                ),
               ),
-              child:                   iconUrl != null
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
+              child: iconUrl != null && iconUrl.isNotEmpty
+                  ? ClipOval(
                       child: ImageUtils.buildNetworkImage(
                         imageUrl: iconUrl,
-                        width: 60,
-                        height: 60,
+                        width: iconSize,
+                        height: iconSize,
                         fit: BoxFit.cover,
                         placeholder: Container(
-                          width: 60,
-                          height: 60,
+                          width: iconSize,
+                          height: iconSize,
                           color: isSelected
-                              ? AppTheme.primaryGreen.withOpacity(0.3)
-                              : AppTheme.primaryGreenLight.withOpacity(0.1),
+                              ? selectedColor.withOpacity(0.2)
+                              : AppTheme.bgGray,
                           child: Icon(
-                            Icons.category,
-                            color: isSelected ? Colors.white : AppTheme.primaryGreen,
-                            size: 30,
+                            _getCategoryIcon(name),
+                            color: isSelected ? selectedColor : AppTheme.textSecondary,
+                            size: iconSize * 0.5,
                           ),
                         ),
                         errorWidget: Icon(
-                          Icons.category,
-                          color: isSelected ? Colors.white : AppTheme.primaryGreen,
-                          size: 30,
+                          _getCategoryIcon(name),
+                          color: isSelected ? selectedColor : AppTheme.textSecondary,
+                          size: iconSize * 0.5,
                         ),
                       ),
                     )
                   : Icon(
-                      Icons.category,
-                      color: isSelected ? Colors.white : AppTheme.primaryGreen,
-                      size: 30,
+                      _getCategoryIcon(name),
+                      color: isSelected ? selectedColor : AppTheme.textSecondary,
+                      size: iconSize * 0.5,
                     ),
             ),
             const SizedBox(height: 8),
+            // Category name
             Text(
               name,
               style: TextStyle(
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                fontSize: fontSize,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                 color: isSelected
-                    ? AppTheme.primaryGreen
+                    ? (isAllCategory ? AppTheme.primaryGreen : AppTheme.textPrimary)
                     : AppTheme.textSecondary,
               ),
               textAlign: TextAlign.center,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
+            // Colored underline for selected category (green for "All", red for others)
             if (isSelected)
               Container(
                 margin: const EdgeInsets.only(top: 4),
-                height: 2,
-                width: 40,
+                height: 2.5,
+                width: itemWidth * 0.5,
                 decoration: BoxDecoration(
-                  color: AppTheme.primaryGreen,
+                  color: selectedColor,
                   borderRadius: BorderRadius.circular(1),
                 ),
               ),
@@ -481,121 +607,30 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     );
   }
 
-  Widget _buildFilterSection() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: SizedBox(
-        height: 40,
-        child: ListView(
-          scrollDirection: Axis.horizontal,
-          children: [
-            _buildFilterChip(
-              'Filters',
-              Icons.filter_list,
-              _selectedFilter == 'filters',
-              () {
-                setState(() {
-                  _selectedFilter = _selectedFilter == 'filters' ? null : 'filters';
-                });
-                // TODO: Show filter dialog
-              },
-            ),
-            const SizedBox(width: 8),
-            _buildFilterChip(
-              'Under ₹150',
-              null,
-              _selectedFilter == 'price',
-              () {
-                setState(() {
-                  _selectedFilter = _selectedFilter == 'price' ? null : 'price';
-                });
-                // TODO: Apply price filter
-              },
-            ),
-            const SizedBox(width: 8),
-            _buildFilterChip(
-              'Under 30 mins',
-              null,
-              _selectedFilter == 'time',
-              () {
-                setState(() {
-                  _selectedFilter = _selectedFilter == 'time' ? null : 'time';
-                });
-                // TODO: Apply time filter
-              },
-            ),
-            const SizedBox(width: 8),
-            _buildFilterChip(
-              'Great offer',
-              null,
-              _selectedFilter == 'offer',
-              () {
-                setState(() {
-                  _selectedFilter = _selectedFilter == 'offer' ? null : 'offer';
-                });
-                // TODO: Apply offer filter
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFilterChip(
-    String label,
-    IconData? icon,
-    bool isSelected,
-    VoidCallback onTap,
-  ) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? AppTheme.primaryGreen
-              : AppTheme.bgLightGray,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected
-                ? AppTheme.primaryGreen
-                : AppTheme.borderLight,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (icon != null) ...[
-              Icon(
-                icon,
-                size: 16,
-                color: isSelected ? Colors.white : AppTheme.textSecondary,
-              ),
-              const SizedBox(width: 4),
-            ],
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                color: isSelected
-                    ? Colors.white
-                    : AppTheme.textSecondary,
-              ),
-            ),
-            if (icon == Icons.filter_list) ...[
-              const SizedBox(width: 4),
-              Icon(
-                Icons.keyboard_arrow_down,
-                size: 16,
-                color: isSelected ? Colors.white : AppTheme.textSecondary,
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
+  /// Get appropriate icon for category based on name
+  IconData _getCategoryIcon(String categoryName) {
+    final name = categoryName.toLowerCase();
+    if (name.contains('all') || name == 'all') {
+      return Icons.apps;
+    } else if (name.contains('biryani') || name.contains('biriyani')) {
+      return Icons.restaurant;
+    } else if (name.contains('chicken')) {
+      return Icons.fastfood;
+    } else if (name.contains('parotta') || name.contains('porotta') || name.contains('paratha')) {
+      return Icons.breakfast_dining;
+    } else if (name.contains('rice') || name.contains('fried')) {
+      return Icons.rice_bowl;
+    } else if (name.contains('pizza')) {
+      return Icons.local_pizza;
+    } else if (name.contains('burger')) {
+      return Icons.lunch_dining;
+    } else if (name.contains('dessert') || name.contains('sweet')) {
+      return Icons.cake;
+    } else if (name.contains('drink') || name.contains('beverage')) {
+      return Icons.local_drink;
+    } else {
+      return Icons.category;
+    }
   }
 
   Widget _buildRestaurantsSection(bool isTablet, bool isDesktop) {

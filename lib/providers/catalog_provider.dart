@@ -292,12 +292,48 @@ class CatalogProvider with ChangeNotifier {
     notifyListeners();
 
     try {
+      debugPrint('🟢 Loading product categories from API...');
       final data = await _apiService.getProductCategories();
-      _productCategories = data
-          .map((json) => ProductCategoryModel.fromJson(json as Map<String, dynamic>))
-          .toList();
+      debugPrint('🟢 Product categories API response: ${data.length} items');
+      
+      if (data.isEmpty) {
+        debugPrint('⚠️ Product categories API returned empty list');
+        _productCategories = [];
+        _categoriesError = null;
+        _isLoadingCategories = false;
+        notifyListeners();
+        return;
+      }
+      
+      _productCategories = [];
+      for (var item in data) {
+        try {
+          if (item is! Map<String, dynamic>) {
+            debugPrint('⚠️ Product category item is not a Map: ${item.runtimeType}');
+            continue;
+          }
+          
+          final category = ProductCategoryModel.fromJson(item);
+          _productCategories.add(category);
+          debugPrint('✅ Parsed product category: ${category.name} (ID: ${category.id})');
+        } catch (e, stackTrace) {
+          debugPrint('❌ Error parsing product category: $e');
+          debugPrint('   JSON: $item');
+          debugPrint('   Stack trace: $stackTrace');
+          // Continue with other categories
+        }
+      }
+      
+      debugPrint('✅ Product categories loaded successfully: ${_productCategories.length} items');
+      if (_productCategories.isNotEmpty) {
+        for (var cat in _productCategories) {
+          debugPrint('   - ${cat.name} (${cat.id})');
+        }
+      }
       _categoriesError = null;
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error loading product categories: $e');
+      debugPrint('   Stack trace: $stackTrace');
       _categoriesError = e.toString();
       _productCategories = [];
     } finally {
@@ -309,13 +345,48 @@ class CatalogProvider with ChangeNotifier {
   /// Load vendor categories
   Future<void> loadVendorCategories() async {
     try {
+      debugPrint('🔵 Loading vendor categories from API...');
       final data = await _apiService.getVendorCategories();
-      _vendorCategories = data
-          .map((json) => VendorCategoryModel.fromJson(json as Map<String, dynamic>))
-          .toList();
-    } catch (e) {
-      // Silently fail for vendor categories
+      debugPrint('🔵 Vendor categories API response: ${data.length} items');
+      
+      if (data.isEmpty) {
+        debugPrint('⚠️ Vendor categories API returned empty list');
+        _vendorCategories = [];
+        notifyListeners();
+        return;
+      }
+      
       _vendorCategories = [];
+      for (var item in data) {
+        try {
+          if (item is! Map<String, dynamic>) {
+            debugPrint('⚠️ Vendor category item is not a Map: ${item.runtimeType}');
+            continue;
+          }
+          
+          final category = VendorCategoryModel.fromJson(item);
+          _vendorCategories.add(category);
+          debugPrint('✅ Parsed vendor category: ${category.name} (ID: ${category.id})');
+        } catch (e, stackTrace) {
+          debugPrint('❌ Error parsing vendor category: $e');
+          debugPrint('   JSON: $item');
+          debugPrint('   Stack trace: $stackTrace');
+          // Continue with other categories
+        }
+      }
+      
+      debugPrint('✅ Vendor categories loaded successfully: ${_vendorCategories.length} items');
+      if (_vendorCategories.isNotEmpty) {
+        for (var cat in _vendorCategories) {
+          debugPrint('   - ${cat.name} (${cat.id})');
+        }
+      }
+      notifyListeners(); // CRITICAL: Notify listeners so UI updates
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error loading vendor categories: $e');
+      debugPrint('   Stack trace: $stackTrace');
+      _vendorCategories = [];
+      notifyListeners(); // Still notify even on error
     }
   }
 
