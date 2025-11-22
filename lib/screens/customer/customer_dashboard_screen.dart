@@ -49,7 +49,13 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Food Delivery'),
+            const Text(
+              'FRESH KART',
+              style: TextStyle(
+                color: AppTheme.primaryGreen,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             if (user != null)
               Text(
                 'Welcome, ${user.firstName ?? user.phoneNumber ?? "User"}',

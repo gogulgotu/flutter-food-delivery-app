@@ -25,12 +25,31 @@ class OrderModel {
   });
 
   factory OrderModel.fromJson(Map<String, dynamic> json) {
+    // Handle vendor - can be a full object or just an ID string
+    VendorInfo? vendor;
+    final vendorData = json['vendor'];
+    if (vendorData != null) {
+      if (vendorData is Map<String, dynamic>) {
+        // Full vendor object
+        vendor = VendorInfo.fromJson(vendorData);
+      } else if (vendorData is String) {
+        // Just vendor ID - create minimal vendor info
+        // Try to get vendor name from other fields
+        final vendorName = json['vendor_name'] as String? ?? 'Restaurant';
+        vendor = VendorInfo(
+          id: vendorData,
+          name: vendorName,
+          image: json['vendor_image'] as String?,
+          phone: json['vendor_phone'] as String?,
+          address: json['vendor_address'] as String?,
+        );
+      }
+    }
+
     return OrderModel(
       id: json['id'] as String,
       orderNumber: json['order_number'] as String,
-      vendor: json['vendor'] != null
-          ? VendorInfo.fromJson(json['vendor'] as Map<String, dynamic>)
-          : null,
+      vendor: vendor,
       totalAmount: (json['total_amount'] as num).toDouble(),
       orderStatus: json['order_status'] as String,
       paymentStatus: json['payment_status'] as String,

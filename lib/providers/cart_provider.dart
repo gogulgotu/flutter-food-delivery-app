@@ -35,17 +35,61 @@ class CartProvider with ChangeNotifier {
       final data = await _apiService.getCart(vendorId);
       debugPrint('🛒 Cart data received: $data');
       
-      _cart = CartModel.fromJson(data);
-      _error = null;
+      // Verify the cart vendor matches the requested vendor before accepting it
+      final cartVendorId = data['vendor_id'] as String? ?? data['vendor'] as String?;
+      final hasVendorMismatch = cartVendorId != null && cartVendorId != vendorId;
       
-      // Update vendor ID from the loaded cart to ensure we have it for future refreshes
-      if (_cart != null && _cart!.vendor.id.isNotEmpty) {
-        _currentVendorId = _cart!.vendor.id;
-        // Store vendor ID persistently for future sessions
-        await _saveVendorId(_currentVendorId!);
+      if (hasVendorMismatch) {
+        debugPrint('⚠️ WARNING: Cart vendor mismatch!');
+        debugPrint('   Requested vendor: $vendorId');
+        debugPrint('   Received vendor: $cartVendorId');
+        debugPrint('   This may indicate a backend issue or the user has items in multiple carts.');
+        
+        // If we already have a cart for the requested vendor, don't overwrite it with wrong vendor's cart
+        if (_cart != null && _cart!.vendor.id == vendorId && _cart!.items.isNotEmpty) {
+          debugPrint('⚠️ Keeping existing cart for vendor $vendorId (${_cart!.itemCount} items)');
+          debugPrint('   Backend returned wrong vendor\'s cart - not overwriting existing cart.');
+          _currentVendorId = vendorId;
+          // Don't overwrite _cart with wrong vendor's data
+          _isLoading = false;
+          notifyListeners();
+          return;
+        }
+        
+        // If backend returned wrong vendor and we don't have a cart for requested vendor,
+        // still don't accept wrong vendor's cart - keep existing cart or leave empty
+        if (_cart != null && _cart!.vendor.id == vendorId) {
+          debugPrint('⚠️ Backend returned wrong vendor\'s cart. Keeping existing cart for vendor $vendorId.');
+          _currentVendorId = vendorId;
+          _isLoading = false;
+          notifyListeners();
+          return;
+        }
+        
+        // Don't update _currentVendorId if there's a mismatch
+        // Keep the requested vendor ID instead
       }
       
-      debugPrint('✅ Cart loaded: ${_cart!.itemCount} items');
+      // Only parse and set cart if we should accept this data
+      // (either correct vendor or no existing cart for requested vendor)
+      if (!hasVendorMismatch || _cart == null || _cart!.vendor.id != vendorId) {
+        _cart = CartModel.fromJson(data);
+        _error = null;
+      }
+      
+      // Update vendor ID from the loaded cart ONLY if it matches what we requested
+      if (_cart != null && _cart!.vendor.id.isNotEmpty) {
+        if (_cart!.vendor.id == vendorId) {
+          _currentVendorId = _cart!.vendor.id;
+          // Store vendor ID persistently for future sessions
+          await _saveVendorId(_currentVendorId!);
+        } else {
+          debugPrint('⚠️ Keeping requested vendor ID ($vendorId) instead of cart vendor (${_cart!.vendor.id})');
+          _currentVendorId = vendorId; // Keep the requested vendor ID
+        }
+      }
+      
+      debugPrint('✅ Cart loaded: ${_cart!.itemCount} items (vendor: ${_cart!.vendor.id})');
     } catch (e, stackTrace) {
       _error = e.toString().replaceFirst('Exception: ', '');
       debugPrint('❌ Error loading cart: $_error');
@@ -65,34 +109,177 @@ class CartProvider with ChangeNotifier {
     String? vendorId,
   }) async {
     try {
-      debugPrint('➕ Adding to cart: product=$productId, quantity=$quantity');
+      debugPrint('➕ Adding to cart: product=$productId, quantity=$quantity, vendor=$vendorId');
       
-      await _apiService.addToCart(
+      // Ensure we have a vendor ID
+      String? targetVendorId = vendorId ?? _currentVendorId;
+      
+      if (targetVendorId == null || targetVendorId.isEmpty) {
+        debugPrint('❌ Cannot add to cart: No vendor ID provided');
+        _error = 'Vendor information is missing. Please try again.';
+        notifyListeners();
+        return false;
+      }
+
+      // Make the API call to add item
+      final response = await _apiService.addToCart(
         productId: productId,
         quantity: quantity,
         variantId: variantId,
       );
 
-      // Reload cart if we know the vendor
-      if (vendorId != null) {
-        await loadCart(vendorId);
-      } else if (_currentVendorId != null) {
-        await loadCart(_currentVendorId!);
+      debugPrint('✅ Add to cart API response: $response');
+      
+      // Extract vendor_id from the response (the item was added to this vendor's cart)
+      String? responseVendorId;
+      if (response is Map<String, dynamic>) {
+        responseVendorId = response['vendor_id'] as String?;
+        if (responseVendorId == null || responseVendorId.isEmpty) {
+          // Try alternative field names
+          responseVendorId = response['vendor'] as String?;
+        }
+        debugPrint('📦 Vendor ID from addToCart response: $responseVendorId');
+      }
+      
+      // Use vendor ID from response if available, otherwise use the provided one
+      final actualVendorId = responseVendorId ?? targetVendorId;
+      if (actualVendorId == null || actualVendorId.isEmpty) {
+        debugPrint('❌ Cannot reload cart: No vendor ID available');
+        _error = 'Unable to refresh cart. Please check your cart manually.';
+        notifyListeners();
+        return true; // Still return true since the API call succeeded
+      }
+      
+      // Update current vendor ID to match the vendor from the response
+      if (responseVendorId != null && responseVendorId != _currentVendorId) {
+        debugPrint('🔄 Updating current vendor ID from $targetVendorId to $responseVendorId');
+        _currentVendorId = responseVendorId;
+        await _saveVendorId(responseVendorId);
+      }
+      
+      debugPrint('🔄 Reloading cart for vendor: $actualVendorId');
+      
+      // Wait a brief moment to ensure the backend has processed the request
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // Extract cart_id from addToCart response - we'll need this if vendor mismatch occurs
+      String? responseCartId;
+      Map<String, dynamic>? cartItemData;
+      if (response is Map<String, dynamic>) {
+        responseCartId = response['cart_id'] as String?;
+        cartItemData = response; // Store the full response for constructing cart
       }
 
-      debugPrint('✅ Item added to cart successfully');
+      // Reload cart using the vendor ID from the response
+      await loadCart(actualVendorId);
+
+      // Verify the cart vendor matches what we expect
+      bool vendorMismatch = false;
+      if (_cart != null) {
+        final cartVendorId = _cart!.vendor.id;
+        if (cartVendorId != actualVendorId) {
+          vendorMismatch = true;
+          debugPrint('⚠️ Cart vendor mismatch detected!');
+          debugPrint('   Expected vendor: $actualVendorId');
+          debugPrint('   Received vendor: $cartVendorId');
+          debugPrint('   Cart ID from addToCart: $responseCartId');
+          debugPrint('   Cart ID from getCart: ${_cart!.id}');
+          debugPrint('   This indicates the backend returned the wrong cart.');
+        }
+      }
+
+      // If vendor mismatch, construct a cart from addToCart response
+      if (vendorMismatch && cartItemData != null && responseCartId != null) {
+        debugPrint('🔄 Vendor mismatch: Constructing cart from addToCart response...');
+        
+        try {
+          // Extract vendor info from response
+          final vendorName = cartItemData['vendor_name'] as String? ?? 'Restaurant';
+          
+          // Create a cart item from the addToCart response
+          final cartItem = CartItemModel.fromJson(cartItemData);
+          
+          // Construct a minimal cart from the response
+          // Use the cart_id and vendor_id from the addToCart response
+          final cartData = <String, dynamic>{
+            'id': responseCartId,
+            'vendor': actualVendorId,
+            'vendor_id': actualVendorId,
+            'vendor_name': vendorName,
+            'items': [cartItemData], // The item that was just added
+            'subtotal': cartItemData['total_price'] ?? 0.0,
+            'delivery_fee': 0.0,
+            'tax': 0.0,
+            'total': cartItemData['total_price'] ?? 0.0,
+          };
+          
+          // Create cart model from constructed data
+          _cart = CartModel.fromJson(cartData);
+          _currentVendorId = actualVendorId;
+          await _saveVendorId(actualVendorId);
+          
+          debugPrint('✅ Constructed cart from addToCart response');
+          debugPrint('   Cart ID: $responseCartId');
+          debugPrint('   Vendor: $actualVendorId');
+          debugPrint('   Items: 1');
+          
+          notifyListeners();
+          return true;
+        } catch (e, stackTrace) {
+          debugPrint('❌ Error constructing cart from response: $e');
+          debugPrint('   Stack trace: $stackTrace');
+          
+          // Fall back to retry
+          await Future.delayed(const Duration(milliseconds: 1500));
+          await loadCart(actualVendorId);
+          
+          if (_cart != null && _cart!.vendor.id == actualVendorId) {
+            debugPrint('✅ Vendor match after retry!');
+          } else {
+            debugPrint('❌ Still getting wrong vendor after retry.');
+            return true; // Still return true since add succeeded
+          }
+        }
+      }
+
+      // Verify the item was actually added
+      if (_cart != null && _cart!.items.isNotEmpty) {
+        final itemExists = _cart!.items.any((item) => item.product.id == productId);
+        if (itemExists) {
+          debugPrint('✅ Item added to cart successfully and verified');
+          return true;
+        } else {
+          debugPrint('⚠️ Cart reloaded but item not found. Item count: ${_cart!.itemCount}');
+          debugPrint('⚠️ Cart vendor: ${_cart!.vendor.id}, Expected vendor: $actualVendorId');
+          
+          if (vendorMismatch) {
+            debugPrint('⚠️ Backend returned wrong vendor\'s cart. Item was added but not visible.');
+            debugPrint('⚠️ The item exists in vendor $actualVendorId\'s cart, but backend shows vendor ${_cart!.vendor.id}\'s cart.');
+          }
+        }
+      } else {
+        debugPrint('⚠️ Cart is empty after reload. Item may not have been added.');
+        debugPrint('⚠️ Requested vendor: $actualVendorId, Cart vendor: ${_cart?.vendor.id ?? "null"}');
+        
+        if (vendorMismatch) {
+          debugPrint('⚠️ Backend returned wrong vendor\'s cart. Item was successfully added but cart shows different vendor.');
+        }
+      }
+
+      debugPrint('✅ Item added to cart (cart may need refresh)');
       return true;
-    } catch (e) {
+    } catch (e, stackTrace) {
       final errorMessage = e.toString().replaceFirst('Exception: ', '');
       _error = errorMessage;
+      
+      debugPrint('❌ Error adding to cart: $_error');
+      debugPrint('❌ Stack trace: $stackTrace');
       
       // Special handling for authentication errors
       if (errorMessage.contains('Authentication') || errorMessage.contains('credentials')) {
         debugPrint('❌ Authentication error adding to cart: $_error');
         debugPrint('⚠️ User may need to log in again');
         _error = 'Please log in to add items to cart';
-      } else {
-        debugPrint('❌ Error adding to cart: $_error');
       }
       
       notifyListeners();

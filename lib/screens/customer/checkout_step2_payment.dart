@@ -7,6 +7,7 @@ import '../../models/cart_model.dart';
 import '../../providers/cart_provider.dart';
 import '../../theme/app_theme.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'order_status_splash_screen.dart';
 
 /// Checkout Step 2: Payment Method
 /// 
@@ -348,28 +349,41 @@ class _CheckoutStep2PaymentState extends State<CheckoutStep2Payment> {
     widget.onOrderCreated(orderData);
 
     if (mounted) {
-      final orderNumber = orderData['order_number'] ?? orderData['id'] ?? 'Order';
+      // Navigate to splash screen with order status
+      // Handle order_status as either int or string, prefer order_status_code
+      String orderStatusStr = 'order_placed';
+      if (orderData['order_status_code'] != null) {
+        orderStatusStr = orderData['order_status_code'] as String;
+      } else if (orderData['order_status'] != null) {
+        final status = orderData['order_status'];
+        if (status is String) {
+          orderStatusStr = status;
+        } else if (status is int) {
+          // Convert int status to string if needed
+          // For now, assume any non-zero int is a valid status (not cancelled/error)
+          orderStatusStr = status == 0 ? 'cancelled' : 'pending';
+        }
+      }
+      final orderStatus = orderStatusStr.toLowerCase();
       
-      // Show success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            _selectedPaymentMethod == 'cod'
-                ? 'Order #$orderNumber placed successfully!'
-                : 'Order #$orderNumber created. Redirecting to payment...',
+      // Determine status for splash screen
+      String splashStatus;
+      if (orderStatus == 'cancelled') {
+        splashStatus = 'cancelled';
+      } else if (orderStatus.contains('error') || orderStatus.contains('fail')) {
+        splashStatus = 'error';
+      } else {
+        splashStatus = 'confirmed';
+      }
+
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => OrderStatusSplashScreen(
+            orderData: orderData,
+            status: splashStatus,
           ),
-          backgroundColor: AppTheme.primaryGreen,
-          duration: const Duration(seconds: 3),
         ),
       );
-
-      // Navigate to home after successful order
-      // TODO: Navigate to order detail screen when implemented
-      Future.delayed(const Duration(seconds: 2), () {
-        if (mounted) {
-          Navigator.of(context).popUntil((route) => route.isFirst);
-        }
-      });
     }
   }
 

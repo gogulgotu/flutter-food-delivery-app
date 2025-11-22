@@ -502,22 +502,38 @@ class ApiService {
         'product': productId,
         'quantity': quantity,
       };
-      if (variantId != null) {
+      if (variantId != null && variantId.isNotEmpty) {
         data['variant'] = variantId;
       }
 
-      debugPrint('🟢 Adding to cart: ${AppConfig.cartEndpoint}/items/ with data: $data');
+      debugPrint('🟢 Adding to cart: ${AppConfig.cartEndpoint}/items/');
+      debugPrint('🟢 Add to cart request data: $data');
       final response = await _dio.post(
         '${AppConfig.cartEndpoint}/items/',
         data: data,
       );
       debugPrint('🟢 Add to cart response status: ${response.statusCode}');
       debugPrint('🟢 Add to cart response: ${response.data}');
+      
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        debugPrint('⚠️ Unexpected status code: ${response.statusCode}');
+      }
+      
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {
+      // Log detailed error information
+      debugPrint('❌ DioException adding to cart:');
+      debugPrint('   Status code: ${e.response?.statusCode}');
+      debugPrint('   Response data: ${e.response?.data}');
+      debugPrint('   Request path: ${e.requestOptions.path}');
+      debugPrint('   Request data: ${e.requestOptions.data}');
+      
       final error = _handleError(e);
       debugPrint('❌ Error adding to cart: $error');
       throw error;
+    } catch (e) {
+      debugPrint('❌ Unexpected error adding to cart: $e');
+      rethrow;
     }
   }
 
@@ -829,6 +845,46 @@ class ApiService {
   Future<Map<String, dynamic>> getOrder(String orderId) async {
     try {
       final response = await _dio.get('${AppConfig.ordersEndpoint}/$orderId/');
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// Cancel order
+  /// 
+  /// [orderId] - Order ID to cancel
+  /// [reason] - Cancellation reason
+  Future<Map<String, dynamic>> cancelOrder(String orderId, String reason) async {
+    try {
+      final response = await _dio.post(
+        '${AppConfig.ordersEndpoint}/$orderId/cancel/',
+        data: {'reason': reason},
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// Get order history/tracking
+  /// 
+  /// [orderId] - Order ID
+  Future<Map<String, dynamic>> getOrderHistory(String orderId) async {
+    try {
+      final response = await _dio.get('${AppConfig.ordersEndpoint}/$orderId/history/');
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// Get order ETA (estimated time of arrival)
+  /// 
+  /// [orderId] - Order ID
+  Future<Map<String, dynamic>> getOrderETA(String orderId) async {
+    try {
+      final response = await _dio.get('${AppConfig.ordersEndpoint}/$orderId/eta/');
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {
       throw _handleError(e);

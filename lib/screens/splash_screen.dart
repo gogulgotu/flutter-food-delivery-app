@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../models/user_model.dart';
+import '../theme/app_theme.dart';
 import 'auth/phone_number_screen.dart';
 import 'auth/location_collection_screen.dart';
 import 'customer/customer_dashboard_screen.dart';
@@ -111,9 +112,10 @@ class _SplashScreenState extends State<SplashScreen> {
             const SizedBox(height: 24),
             // App Name
             Text(
-              'Food Delivery',
+              'FRESH KART',
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.bold,
+                    color: AppTheme.primaryGreen,
                   ),
             ),
             const SizedBox(height: 48),
