@@ -4,6 +4,7 @@ import '../../providers/cart_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/image_utils.dart';
+import 'checkout_screen.dart';
 
 /// Cart Screen
 /// 
@@ -19,9 +20,17 @@ class _CartScreenState extends State<CartScreen> {
   @override
   void initState() {
     super.initState();
-    // Refresh cart when screen loads
+    // Load cart when screen loads
+    // Try to load from existing cart first, then refresh
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<CartProvider>().refreshCart();
+      final cartProvider = context.read<CartProvider>();
+      // Try loading from existing cart first (useful after login)
+      cartProvider.loadCartFromExisting().then((_) {
+        // If that didn't work, try refresh
+        if (cartProvider.currentVendorId == null) {
+          cartProvider.refreshCart();
+        }
+      });
     });
   }
 
@@ -211,10 +220,34 @@ class _CartScreenState extends State<CartScreen> {
                             InkWell(
                               onTap: item.quantity > 1
                                   ? () async {
-                                      await cartProvider.updateCartItem(
+                                      final success = await cartProvider.updateCartItem(
                                         itemId: item.id,
                                         quantity: item.quantity - 1,
                                       );
+                                      
+                                      if (!success && mounted) {
+                                        final errorMsg = cartProvider.error ?? 'Failed to update quantity';
+                                        if (errorMsg.contains('log in')) {
+                                          final scaffoldMessenger = ScaffoldMessenger.of(context);
+                                          scaffoldMessenger.clearSnackBars();
+                                          scaffoldMessenger.showSnackBar(
+                                            SnackBar(
+                                              content: Text(errorMsg),
+                                              backgroundColor: AppTheme.error,
+                                              duration: const Duration(seconds: 3),
+                                              behavior: SnackBarBehavior.floating,
+                                              action: SnackBarAction(
+                                                label: 'LOGIN',
+                                                textColor: Colors.white,
+                                                onPressed: () {
+                                                  scaffoldMessenger.hideCurrentSnackBar();
+                                                  Navigator.of(context).pushReplacementNamed('/login');
+                                                },
+                                              ),
+                                            ),
+                                          );
+                                        }
+                                      }
                                     }
                                   : null,
                               borderRadius: BorderRadius.circular(8),
@@ -252,10 +285,34 @@ class _CartScreenState extends State<CartScreen> {
                                 onSubmitted: (value) async {
                                   final newQuantity = int.tryParse(value);
                                   if (newQuantity != null && newQuantity > 0 && newQuantity != item.quantity) {
-                                    await cartProvider.updateCartItem(
+                                    final success = await cartProvider.updateCartItem(
                                       itemId: item.id,
                                       quantity: newQuantity,
                                     );
+                                    
+                                    if (!success && mounted) {
+                                      final errorMsg = cartProvider.error ?? 'Failed to update quantity';
+                                      if (errorMsg.contains('log in')) {
+                                        final scaffoldMessenger = ScaffoldMessenger.of(context);
+                                        scaffoldMessenger.clearSnackBars();
+                                        scaffoldMessenger.showSnackBar(
+                                          SnackBar(
+                                            content: Text(errorMsg),
+                                            backgroundColor: AppTheme.error,
+                                            duration: const Duration(seconds: 3),
+                                            behavior: SnackBarBehavior.floating,
+                                            action: SnackBarAction(
+                                              label: 'LOGIN',
+                                              textColor: Colors.white,
+                                              onPressed: () {
+                                                scaffoldMessenger.hideCurrentSnackBar();
+                                                Navigator.of(context).pushReplacementNamed('/login');
+                                              },
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    }
                                   }
                                 },
                               ),
@@ -263,10 +320,34 @@ class _CartScreenState extends State<CartScreen> {
                             // Increase Button
                             InkWell(
                               onTap: () async {
-                                await cartProvider.updateCartItem(
+                                final success = await cartProvider.updateCartItem(
                                   itemId: item.id,
                                   quantity: item.quantity + 1,
                                 );
+                                
+                                if (!success && mounted) {
+                                  final errorMsg = cartProvider.error ?? 'Failed to update quantity';
+                                  if (errorMsg.contains('log in')) {
+                                    final scaffoldMessenger = ScaffoldMessenger.of(context);
+                                    scaffoldMessenger.clearSnackBars();
+                                    scaffoldMessenger.showSnackBar(
+                                      SnackBar(
+                                        content: Text(errorMsg),
+                                        backgroundColor: AppTheme.error,
+                                        duration: const Duration(seconds: 3),
+                                        behavior: SnackBarBehavior.floating,
+                                        action: SnackBarAction(
+                                          label: 'LOGIN',
+                                          textColor: Colors.white,
+                                          onPressed: () {
+                                            scaffoldMessenger.hideCurrentSnackBar();
+                                            Navigator.of(context).pushReplacementNamed('/login');
+                                          },
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                }
                               },
                               borderRadius: BorderRadius.circular(8),
                               child: Container(
@@ -320,14 +401,43 @@ class _CartScreenState extends State<CartScreen> {
                 );
 
                 if (confirm == true && mounted) {
-                  await cartProvider.removeFromCart(item.id);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Item removed from cart'),
-                      backgroundColor: AppTheme.error,
-                      duration: Duration(seconds: 3),
-                    ),
-                  );
+                  final success = await cartProvider.removeFromCart(item.id);
+                  
+                  if (mounted) {
+                    if (success) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Item removed from cart'),
+                          backgroundColor: AppTheme.primaryGreen,
+                          duration: Duration(seconds: 3),
+                        ),
+                      );
+                    } else {
+                      // Show error message from provider
+                      final errorMsg = cartProvider.error ?? 'Failed to remove item';
+                      final scaffoldMessenger = ScaffoldMessenger.of(context);
+                      scaffoldMessenger.clearSnackBars(); // Clear any existing snackbars
+                      scaffoldMessenger.showSnackBar(
+                        SnackBar(
+                          content: Text(errorMsg),
+                          backgroundColor: AppTheme.error,
+                          duration: const Duration(seconds: 3),
+                          behavior: SnackBarBehavior.floating,
+                          action: errorMsg.contains('log in')
+                              ? SnackBarAction(
+                                  label: 'LOGIN',
+                                  textColor: Colors.white,
+                                  onPressed: () {
+                                    scaffoldMessenger.hideCurrentSnackBar();
+                                    // Navigate to login screen
+                                    Navigator.of(context).pushReplacementNamed('/login');
+                                  },
+                                )
+                              : null,
+                        ),
+                      );
+                    }
+                  }
                 }
               },
             ),
@@ -391,12 +501,23 @@ class _CartScreenState extends State<CartScreen> {
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () {
-                    // TODO: Navigate to checkout
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Checkout functionality coming soon!'),
-                        backgroundColor: AppTheme.primaryGreen,
-                        duration: Duration(seconds: 3),
+                    // Check authentication
+                    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                    if (!authProvider.isAuthenticated) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Please login to proceed to checkout'),
+                          backgroundColor: AppTheme.error,
+                          duration: Duration(seconds: 3),
+                        ),
+                      );
+                      return;
+                    }
+
+                    // Navigate to checkout
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const CheckoutScreen(),
                       ),
                     );
                   },

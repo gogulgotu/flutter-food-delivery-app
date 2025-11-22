@@ -1112,11 +1112,25 @@ class _RestaurantDetailsScreenState extends State<RestaurantDetailsScreen> {
         ),
       );
     } else if (!success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      final errorMsg = cartProvider.error ?? 'Failed to add to cart';
+      final scaffoldMessenger = ScaffoldMessenger.of(context);
+      scaffoldMessenger.clearSnackBars();
+      scaffoldMessenger.showSnackBar(
         SnackBar(
-          content: Text(cartProvider.error ?? 'Failed to add to cart'),
+          content: Text(errorMsg),
           backgroundColor: AppTheme.error,
           duration: const Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
+          action: errorMsg.contains('log in')
+              ? SnackBarAction(
+                  label: 'LOGIN',
+                  textColor: Colors.white,
+                  onPressed: () {
+                    scaffoldMessenger.hideCurrentSnackBar();
+                    Navigator.of(context).pushReplacementNamed('/login');
+                  },
+                )
+              : null,
         ),
       );
     }

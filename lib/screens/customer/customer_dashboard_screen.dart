@@ -4,10 +4,14 @@ import 'package:intl/intl.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/customer_dashboard_provider.dart';
 import '../../screens/auth/phone_number_screen.dart';
+import '../../screens/auth/location_collection_screen.dart';
+import '../../services/location_service.dart';
+import '../../services/storage_service.dart';
 import '../../theme/app_theme.dart';
 import '../../models/order_model.dart';
 import '../../models/notification_model.dart';
 import '../../models/wallet_model.dart';
+import '../../models/user_model.dart';
 import '../../widgets/oval_bottom_nav_bar.dart';
 import 'customer_home_screen.dart';
 
@@ -238,19 +242,10 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
         padding: const EdgeInsets.all(16),
         child: Consumer<CustomerDashboardProvider>(
           builder: (context, provider, _) {
-            if (provider.isLoading && provider.wallet == null) {
-              return const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(32.0),
-                  child: CircularProgressIndicator(),
-                ),
-              );
-            }
-
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Wallet Balance Card
+                // Wallet Balance Card (Coming Soon)
                 _buildWalletBalanceCard(provider),
                 const SizedBox(height: 16),
                 
@@ -273,9 +268,6 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
   }
 
   Widget _buildWalletBalanceCard(CustomerDashboardProvider provider) {
-    final wallet = provider.wallet;
-    final isLoading = provider.isLoadingWallet;
-
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -284,8 +276,8 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
           borderRadius: BorderRadius.circular(16),
           gradient: LinearGradient(
             colors: [
-              AppTheme.primaryGreen,
-              AppTheme.primaryGreenDark,
+              AppTheme.primaryGreen.withOpacity(0.8),
+              AppTheme.primaryGreenDark.withOpacity(0.8),
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -295,10 +287,10 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            const Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
+                Text(
                   'Wallet Balance',
                   style: TextStyle(
                     color: Colors.white,
@@ -306,84 +298,35 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.refresh, color: Colors.white),
-                  onPressed: isLoading
-                      ? null
-                      : () => provider.loadWalletBalance(),
+                Icon(
+                  Icons.construction_outlined,
+                  color: Colors.white70,
+                  size: 20,
                 ),
               ],
             ),
             const SizedBox(height: 16),
-            if (isLoading)
-              const SizedBox(
-                height: 40,
-                child: Center(
-                  child: CircularProgressIndicator(color: Colors.white),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Coming Soon',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              )
-            else if (wallet != null)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '₹${wallet.balance.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 36,
-                      fontWeight: FontWeight.bold,
-                    ),
+                const SizedBox(height: 8),
+                Text(
+                  'Wallet feature is under development',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: 14,
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    wallet.currency,
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-              )
-            else
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    '₹0.00',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 36,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  if (provider.walletError != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(
-                        provider.walletError!,
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
+                ),
                 ],
               ),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: () {
-                setState(() {
-                  _selectedIndex = 2; // Navigate to wallet tab
-                });
-              },
-              icon: const Icon(Icons.arrow_forward),
-              label: const Text('View Transactions'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: AppTheme.primaryGreen,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              ),
-            ),
           ],
         ),
       ),
@@ -753,72 +696,54 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
   }
 
   Widget _buildWalletTab() {
-    return Consumer<CustomerDashboardProvider>(
-      builder: (context, provider, _) {
-        // Load transactions when wallet tab is accessed
-        if (provider.walletTransactions.isEmpty && !provider.isLoadingWallet) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            provider.loadWalletTransactions();
-          });
-        }
-
-        return RefreshIndicator(
-          onRefresh: () async {
-            await provider.loadWalletBalance();
-            await provider.loadWalletTransactions();
-          },
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildWalletBalanceCard(provider),
-                const SizedBox(height: 24),
-                Text(
-                  'Recent Transactions',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                ),
-                const SizedBox(height: 12),
-                if (provider.walletTransactions.isEmpty && !provider.isLoadingWallet)
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(32),
-                      child: Column(
-                        children: [
-                          Icon(Icons.account_balance_wallet_outlined,
-                              size: 64, color: AppTheme.textMuted),
-                          const SizedBox(height: 16),
-                          Text(
-                            'No transactions yet',
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(
-                                  color: AppTheme.textSecondary,
-                                ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                else if (provider.isLoadingWallet && provider.walletTransactions.isEmpty)
-                  const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(32.0),
-                      child: CircularProgressIndicator(),
-                    ),
-                  )
-                else
-                  ...provider.walletTransactions.map((transaction) =>
-                      _buildTransactionCard(transaction)),
-              ],
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.wallet_outlined,
+              size: 80,
+              color: AppTheme.textMuted,
             ),
-          ),
-        );
-      },
+            const SizedBox(height: 24),
+            Text(
+              'Wallet Feature',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.textPrimary,
+                  ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Coming Soon',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: AppTheme.primaryGreen,
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+            const SizedBox(height: 24),
+            Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  'We are working on bringing you a secure wallet feature where you can manage your payments, view transaction history, and more. Stay tuned!',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppTheme.textSecondary,
+                        height: 1.5,
+                      ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -955,6 +880,52 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
             user?.phoneNumber ?? '',
             style: TextStyle(color: AppTheme.textSecondary),
           ),
+          
+          // Location Display
+          if (user?.address != null && user?.latitude != null && user?.longitude != null) ...[
+            const SizedBox(height: 24),
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 24),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppTheme.bgLightGray,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.primaryGreen.withOpacity(0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.location_on,
+                        color: AppTheme.primaryGreen,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Delivery Location',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    user!.address!,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          
           const SizedBox(height: 32),
           _buildProfileMenuItem(
             Icons.person_outline,
@@ -962,18 +933,18 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
             () {
               // TODO: Navigate to edit profile
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Edit profile feature coming soon')),
+                const SnackBar(
+                  content: Text('Edit profile feature coming soon'),
+                  duration: Duration(seconds: 3),
+                ),
               );
             },
           ),
           _buildProfileMenuItem(
             Icons.location_on_outlined,
-            'Addresses',
+            user?.address != null ? 'Edit Address' : 'Add Address',
             () {
-              // TODO: Navigate to addresses
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Addresses feature coming soon')),
-              );
+              _showLocationEditDialog(context);
             },
           ),
           _buildProfileMenuItem(
@@ -982,7 +953,10 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
             () {
               // TODO: Navigate to payment methods
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Payment methods feature coming soon')),
+                const SnackBar(
+                  content: Text('Payment methods feature coming soon'),
+                  duration: Duration(seconds: 3),
+                ),
               );
             },
           ),
@@ -1001,7 +975,10 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
             () {
               // TODO: Navigate to help
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Help & Support feature coming soon')),
+                const SnackBar(
+                  content: Text('Help & Support feature coming soon'),
+                  duration: Duration(seconds: 3),
+                ),
               );
             },
           ),
@@ -1109,6 +1086,36 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
         MaterialPageRoute(builder: (context) => const PhoneNumberScreen()),
         (route) => false,
       );
+    }
+  }
+
+  Future<void> _showLocationEditDialog(BuildContext context) async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final user = authProvider.user;
+    
+    if (user == null) return;
+
+    // Navigate to location collection screen for editing
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => LocationCollectionScreen(user: user, isEditing: true),
+      ),
+    );
+
+    if (mounted) {
+      // Refresh user data
+      final updatedUser = await StorageService().getUserData();
+      if (updatedUser != null) {
+        authProvider.updateUser(updatedUser);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Location updated successfully'),
+            backgroundColor: AppTheme.primaryGreen,
+            duration: Duration(seconds: 3),
+          ),
+        );
+        setState(() {}); // Refresh UI
+      }
     }
   }
 }

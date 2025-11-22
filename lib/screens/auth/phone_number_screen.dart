@@ -88,6 +88,7 @@ class _PhoneNumberScreenState extends State<PhoneNumberScreen> {
             authProvider.errorMessage ?? 'Failed to send OTP. Please try again.',
           ),
           backgroundColor: Theme.of(context).colorScheme.error,
+          duration: const Duration(seconds: 3),
         ),
       );
     }

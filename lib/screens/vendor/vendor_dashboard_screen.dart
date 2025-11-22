@@ -47,6 +47,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
           SnackBar(
             content: Text('Error loading dashboard: $e'),
             backgroundColor: AppTheme.error,
+            duration: const Duration(seconds: 3),
           ),
         );
       }
@@ -77,7 +78,10 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
             onPressed: () {
               // TODO: Navigate to notifications
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Notifications feature coming soon')),
+                const SnackBar(
+                  content: Text('Notifications feature coming soon'),
+                  duration: Duration(seconds: 3),
+                ),
               );
             },
           ),

@@ -47,52 +47,33 @@ class CustomerDashboardProvider with ChangeNotifier {
 
   /// Load all dashboard data
   Future<void> loadDashboardData() async {
+    // Wallet feature is disabled - coming soon
     await Future.wait([
-      loadWalletBalance(),
+      // loadWalletBalance(), // Disabled - coming soon
       loadRecentOrders(),
       loadNotifications(),
     ]);
   }
 
   /// Load wallet balance
+  /// ⚠️ DISABLED: Wallet feature coming soon
+  @Deprecated('Wallet feature is coming soon')
   Future<void> loadWalletBalance() async {
-    _isLoadingWallet = true;
+    // Wallet feature is disabled - coming soon
+    // Do nothing to prevent API calls
+    _isLoadingWallet = false;
     _walletError = null;
-    notifyListeners();
-
-    try {
-      final data = await _apiService.getWalletBalance();
-      _wallet = WalletModel.fromJson(data);
-      _walletError = null;
-    } catch (e) {
-      _walletError = e.toString();
-      _wallet = null;
-    } finally {
-      _isLoadingWallet = false;
-      notifyListeners();
-    }
+    _wallet = null;
   }
 
   /// Load wallet transactions
+  /// ⚠️ DISABLED: Wallet feature coming soon
+  @Deprecated('Wallet feature is coming soon')
   Future<void> loadWalletTransactions({int page = 1, int pageSize = 10}) async {
-    try {
-      final data = await _apiService.getWalletTransactions(
-        page: page,
-        pageSize: pageSize,
-      );
-      final results = (data['results'] as List)
-          .map((json) => WalletTransactionModel.fromJson(json))
-          .toList();
-      if (page == 1) {
-        _walletTransactions = results;
-      } else {
-        _walletTransactions.addAll(results);
-      }
-      notifyListeners();
-    } catch (e) {
-      _walletError = e.toString();
-      notifyListeners();
-    }
+    // Wallet feature is disabled - coming soon
+    // Do nothing to prevent API calls
+    _walletTransactions = [];
+    _walletError = null;
   }
 
   /// Load recent orders (limit to 5 most recent)

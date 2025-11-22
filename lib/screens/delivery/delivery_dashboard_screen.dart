@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../screens/auth/phone_number_screen.dart';
 import '../../services/api_service.dart';
+import '../../widgets/delivery_map_widget.dart';
 import '../../theme/app_theme.dart';
 
 /// Delivery Person Dashboard Screen
@@ -49,6 +50,7 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
           SnackBar(
             content: Text('Error loading dashboard: $e'),
             backgroundColor: AppTheme.error,
+            duration: const Duration(seconds: 3),
           ),
         );
       }
@@ -65,7 +67,8 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(_isOnline ? 'You are now online' : 'You are now offline'),
-            backgroundColor: AppTheme.success,
+          backgroundColor: AppTheme.success,
+          duration: const Duration(seconds: 3),
         ),
       );
     } catch (e) {
@@ -73,6 +76,7 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
         SnackBar(
           content: Text('Error updating status: $e'),
           backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
         ),
       );
     }
@@ -388,26 +392,151 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
   }
 
   Widget _buildActiveDeliveriesTab() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.local_shipping_outlined, size: 64, color: AppTheme.textMuted),
-          const SizedBox(height: 16),
-          Text(
-            'Active Deliveries',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: AppTheme.textSecondary,
+    // Get active assignments from dashboard data
+    final activeAssignments = _dashboardData?['active_assignments'] as List?;
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    
+    // For demo purposes, show map with customer location if available
+    // In production, this would fetch from order/delivery data
+    return RefreshIndicator(
+      onRefresh: _loadDashboardData,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (activeAssignments != null && activeAssignments.isNotEmpty) ...[
+              Text(
+                'Active Deliveries (${activeAssignments.length})',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              const SizedBox(height: 16),
+              
+              // Example: Show delivery cards with map
+              ...activeAssignments.map((assignment) {
+                // Extract customer location from assignment
+                final customer = assignment['customer'] as Map<String, dynamic>?;
+                final customerLat = customer?['latitude'] != null 
+                    ? (customer!['latitude'] as num).toDouble() 
+                    : null;
+                final customerLng = customer?['longitude'] != null 
+                    ? (customer!['longitude'] as num).toDouble() 
+                    : null;
+                final customerAddress = customer?['address'] as String?;
+                final customerName = customer?['name'] as String? ?? 
+                                   customer?['first_name'] as String?;
+                
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Delivery #${assignment['id'] ?? 'N/A'}',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        if (customerName != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            'Customer: $customerName',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                        ],
+                        if (customerAddress != null) ...[
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.place,
+                                size: 16,
+                                color: AppTheme.textMuted,
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  customerAddress,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppTheme.textMuted,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                        // Show map if location is available
+                        if (customerLat != null && customerLng != null) ...[
+                          const SizedBox(height: 16),
+                          DeliveryMapWidget(
+                            latitude: customerLat,
+                            longitude: customerLng,
+                            customerName: customerName,
+                            address: customerAddress,
+                          ),
+                        ] else ...[
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: AppTheme.bgLightGray,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(
+                                  Icons.location_off,
+                                  color: AppTheme.textMuted,
+                                ),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Customer location not available',
+                                  style: TextStyle(
+                                    color: AppTheme.textMuted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ] else ...[
+              Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.local_shipping_outlined, size: 64, color: AppTheme.textMuted),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Active Deliveries',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            color: AppTheme.textSecondary,
+                          ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'No active deliveries',
+                      style: TextStyle(color: AppTheme.textTertiary),
+                    ),
+                  ],
                 ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Active deliveries feature coming soon',
-            style: TextStyle(color: AppTheme.textTertiary),
-          ),
-          // TODO: Implement active deliveries list
-          // Use: GET /api/delivery/dashboard/ and parse active_assignments
-        ],
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -473,7 +602,10 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
             () {
               // TODO: Navigate to edit profile
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Edit profile feature coming soon')),
+                const SnackBar(
+                  content: Text('Edit profile feature coming soon'),
+                  duration: Duration(seconds: 3),
+                ),
               );
             },
           ),
@@ -483,7 +615,10 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
             () {
               // TODO: Navigate to earnings
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Earnings feature coming soon')),
+                const SnackBar(
+                  content: Text('Earnings feature coming soon'),
+                  duration: Duration(seconds: 3),
+                ),
               );
             },
           ),
@@ -493,7 +628,10 @@ class _DeliveryDashboardScreenState extends State<DeliveryDashboardScreen> {
             () {
               // TODO: Navigate to help
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Help & Support feature coming soon')),
+                const SnackBar(
+                  content: Text('Help & Support feature coming soon'),
+                  duration: Duration(seconds: 3),
+                ),
               );
             },
           ),

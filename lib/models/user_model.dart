@@ -9,6 +9,9 @@ class UserModel {
   final String? lastName;
   final String userRoleName; // Customer, Vendor, Delivery Person
   final bool? isVerified;
+  final double? latitude;
+  final double? longitude;
+  final String? address;
 
   UserModel({
     required this.id,
@@ -18,6 +21,9 @@ class UserModel {
     this.lastName,
     required this.userRoleName,
     this.isVerified,
+    this.latitude,
+    this.longitude,
+    this.address,
   });
 
   /// Create UserModel from JSON
@@ -30,6 +36,9 @@ class UserModel {
       lastName: json['last_name'] as String?,
       userRoleName: json['user_role_name'] as String? ?? 'Customer',
       isVerified: json['is_verified'] as bool?,
+      latitude: json['latitude'] != null ? (json['latitude'] as num).toDouble() : null,
+      longitude: json['longitude'] != null ? (json['longitude'] as num).toDouble() : null,
+      address: json['address'] as String?,
     );
   }
 
@@ -43,6 +52,9 @@ class UserModel {
       'last_name': lastName,
       'user_role_name': userRoleName,
       'is_verified': isVerified,
+      'latitude': latitude,
+      'longitude': longitude,
+      'address': address,
     };
   }
 
@@ -83,6 +95,9 @@ class UserModel {
     String? lastName,
     String? userRoleName,
     bool? isVerified,
+    double? latitude,
+    double? longitude,
+    String? address,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -92,6 +107,9 @@ class UserModel {
       lastName: lastName ?? this.lastName,
       userRoleName: userRoleName ?? this.userRoleName,
       isVerified: isVerified ?? this.isVerified,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      address: address ?? this.address,
     );
   }
 }

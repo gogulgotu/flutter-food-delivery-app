@@ -6,6 +6,7 @@ import '../../theme/app_theme.dart';
 import '../customer/customer_dashboard_screen.dart';
 import '../vendor/vendor_dashboard_screen.dart';
 import '../delivery/delivery_dashboard_screen.dart';
+import 'location_collection_screen.dart';
 
 /// OTP Verification Screen
 /// 
@@ -103,6 +104,7 @@ class _OtpScreenState extends State<OtpScreen> {
         SnackBar(
           content: const Text('Please enter the complete OTP'),
           backgroundColor: Theme.of(context).colorScheme.error,
+          duration: const Duration(seconds: 3),
         ),
       );
       return;
@@ -129,7 +131,7 @@ class _OtpScreenState extends State<OtpScreen> {
             'Login successful! Welcome, ${authProvider.user!.displayName}',
           ),
           backgroundColor: AppTheme.success,
-          duration: const Duration(seconds: 2),
+          duration: const Duration(seconds: 3),
         ),
       );
 
@@ -139,7 +141,7 @@ class _OtpScreenState extends State<OtpScreen> {
       if (!mounted) return;
 
       // Navigate to appropriate dashboard based on role
-      _navigateToDashboard(authProvider.user!.role);
+      _navigateToDashboard(authProvider.user!.role, authProvider.user!);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -147,28 +149,40 @@ class _OtpScreenState extends State<OtpScreen> {
             authProvider.errorMessage ?? 'Invalid OTP. Please try again.',
           ),
           backgroundColor: Theme.of(context).colorScheme.error,
+          duration: const Duration(seconds: 3),
         ),
       );
     }
   }
 
-  void _navigateToDashboard(UserRole role) {
-    // Clear navigation stack and navigate to dashboard
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(
-        builder: (context) {
-          switch (role) {
-            case UserRole.customer:
-              return const CustomerDashboardScreen();
-            case UserRole.vendor:
-              return const VendorDashboardScreen();
-            case UserRole.deliveryPerson:
-              return const DeliveryDashboardScreen();
-          }
-        },
-      ),
-      (route) => false,
-    );
+  void _navigateToDashboard(UserRole role, UserModel user) {
+    // Check if user has location
+    if (user.latitude == null || user.longitude == null) {
+      // Navigate to location collection screen if location is missing
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (context) => LocationCollectionScreen(user: user),
+        ),
+        (route) => false,
+      );
+    } else {
+      // Navigate to dashboard if location exists
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (context) {
+            switch (role) {
+              case UserRole.customer:
+                return const CustomerDashboardScreen();
+              case UserRole.vendor:
+                return const VendorDashboardScreen();
+              case UserRole.deliveryPerson:
+                return const DeliveryDashboardScreen();
+            }
+          },
+        ),
+        (route) => false,
+      );
+    }
   }
 
   Future<void> _resendOtp() async {
@@ -212,6 +226,7 @@ class _OtpScreenState extends State<OtpScreen> {
             authProvider.errorMessage ?? 'Failed to resend OTP. Please try again.',
           ),
           backgroundColor: Theme.of(context).colorScheme.error,
+          duration: const Duration(seconds: 3),
         ),
       );
     }

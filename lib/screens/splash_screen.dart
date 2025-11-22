@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../models/user_model.dart';
 import 'auth/phone_number_screen.dart';
+import 'auth/location_collection_screen.dart';
 import 'customer/customer_dashboard_screen.dart';
 import 'vendor/vendor_dashboard_screen.dart';
 import 'delivery/delivery_dashboard_screen.dart';
@@ -41,8 +42,20 @@ class _SplashScreenState extends State<SplashScreen> {
 
       // Navigate based on authentication status
       if (authProvider.isAuthenticated && authProvider.user != null) {
-        // User is logged in, navigate to appropriate dashboard
-        _navigateToDashboard(authProvider.user!.role);
+        final user = authProvider.user!;
+        
+        // Check if user has location
+        if (user.latitude == null || user.longitude == null) {
+          // Navigate to location collection screen if location is missing
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => LocationCollectionScreen(user: user),
+            ),
+          );
+        } else {
+          // User is logged in with location, navigate to appropriate dashboard
+          _navigateToDashboard(user.role);
+        }
       } else {
         // User is not logged in, navigate to login
         Navigator.of(context).pushReplacement(

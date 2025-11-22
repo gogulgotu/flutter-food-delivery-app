@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/cart_model.dart';
 import '../services/api_service.dart';
 
@@ -7,6 +8,7 @@ import '../services/api_service.dart';
 /// Manages shopping cart state across the application
 class CartProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
+  static const String _vendorIdKey = 'last_cart_vendor_id';
 
   CartModel? _cart;
   bool _isLoading = false;
@@ -35,6 +37,14 @@ class CartProvider with ChangeNotifier {
       
       _cart = CartModel.fromJson(data);
       _error = null;
+      
+      // Update vendor ID from the loaded cart to ensure we have it for future refreshes
+      if (_cart != null && _cart!.vendor.id.isNotEmpty) {
+        _currentVendorId = _cart!.vendor.id;
+        // Store vendor ID persistently for future sessions
+        await _saveVendorId(_currentVendorId!);
+      }
+      
       debugPrint('✅ Cart loaded: ${_cart!.itemCount} items');
     } catch (e, stackTrace) {
       _error = e.toString().replaceFirst('Exception: ', '');
@@ -73,8 +83,18 @@ class CartProvider with ChangeNotifier {
       debugPrint('✅ Item added to cart successfully');
       return true;
     } catch (e) {
-      _error = e.toString().replaceFirst('Exception: ', '');
-      debugPrint('❌ Error adding to cart: $_error');
+      final errorMessage = e.toString().replaceFirst('Exception: ', '');
+      _error = errorMessage;
+      
+      // Special handling for authentication errors
+      if (errorMessage.contains('Authentication') || errorMessage.contains('credentials')) {
+        debugPrint('❌ Authentication error adding to cart: $_error');
+        debugPrint('⚠️ User may need to log in again');
+        _error = 'Please log in to add items to cart';
+      } else {
+        debugPrint('❌ Error adding to cart: $_error');
+      }
+      
       notifyListeners();
       return false;
     }
@@ -103,8 +123,18 @@ class CartProvider with ChangeNotifier {
       debugPrint('✅ Cart item updated successfully');
       return true;
     } catch (e) {
-      _error = e.toString().replaceFirst('Exception: ', '');
-      debugPrint('❌ Error updating cart item: $_error');
+      final errorMessage = e.toString().replaceFirst('Exception: ', '');
+      _error = errorMessage;
+      
+      // Special handling for authentication errors
+      if (errorMessage.contains('Authentication') || errorMessage.contains('credentials')) {
+        debugPrint('❌ Authentication error updating cart: $_error');
+        debugPrint('⚠️ User may need to log in again');
+        _error = 'Please log in to manage your cart';
+      } else {
+        debugPrint('❌ Error updating cart item: $_error');
+      }
+      
       notifyListeners();
       return false;
     }
@@ -127,8 +157,18 @@ class CartProvider with ChangeNotifier {
       debugPrint('✅ Item removed from cart successfully');
       return true;
     } catch (e) {
-      _error = e.toString().replaceFirst('Exception: ', '');
-      debugPrint('❌ Error removing from cart: $_error');
+      final errorMessage = e.toString().replaceFirst('Exception: ', '');
+      _error = errorMessage;
+      
+      // Special handling for authentication errors
+      if (errorMessage.contains('Authentication') || errorMessage.contains('credentials')) {
+        debugPrint('❌ Authentication error removing from cart: $_error');
+        debugPrint('⚠️ User may need to log in again');
+        _error = 'Please log in to manage your cart';
+      } else {
+        debugPrint('❌ Error removing from cart: $_error');
+      }
+      
       notifyListeners();
       return false;
     }
@@ -139,14 +179,99 @@ class CartProvider with ChangeNotifier {
     _cart = null;
     _currentVendorId = null;
     _error = null;
+    clearSavedVendorId(); // Also clear saved vendor ID
     notifyListeners();
     debugPrint('🧹 Cart cleared');
   }
 
   /// Refresh cart
+  /// Tries to load cart using existing vendor ID from cart or stored vendor ID
   Future<void> refreshCart() async {
+    // First, try to get vendor ID from existing cart
+    String? vendorId = _currentVendorId;
+    
+    // If no vendor ID but we have a cart, extract vendor ID from cart
+    if (vendorId == null && _cart != null) {
+      vendorId = _cart!.vendor.id;
+      _currentVendorId = vendorId;
+      debugPrint('🛒 Using vendor ID from existing cart: $vendorId');
+    }
+    
+    // If we have a vendor ID, load the cart
+    if (vendorId != null) {
+      await loadCart(vendorId);
+    } else {
+      debugPrint('⚠️ Cannot refresh cart: No vendor ID available');
+      // Set loading to false in case it was set
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Load cart using vendor ID from existing cart or stored vendor ID
+  /// This is useful when opening cart page directly after login
+  Future<void> loadCartFromExisting() async {
+    // If we have an existing cart, use its vendor ID
+    if (_cart != null && _cart!.vendor.id.isNotEmpty) {
+      final vendorId = _cart!.vendor.id;
+      debugPrint('🛒 Loading cart from existing cart vendor: $vendorId');
+      await loadCart(vendorId);
+      return;
+    }
+    
+    // If we have a stored vendor ID in memory, use that
     if (_currentVendorId != null) {
+      debugPrint('🛒 Loading cart from stored vendor: $_currentVendorId');
       await loadCart(_currentVendorId!);
+      return;
+    }
+    
+    // Try to load vendor ID from persistent storage (for after login)
+    final savedVendorId = await _loadVendorId();
+    if (savedVendorId != null && savedVendorId.isNotEmpty) {
+      debugPrint('🛒 Loading cart from saved vendor ID: $savedVendorId');
+      _currentVendorId = savedVendorId;
+      await loadCart(savedVendorId);
+      return;
+    }
+    
+    debugPrint('⚠️ Cannot load cart: No vendor ID available');
+    _isLoading = false;
+    notifyListeners();
+  }
+
+  /// Save vendor ID to persistent storage
+  Future<void> _saveVendorId(String vendorId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_vendorIdKey, vendorId);
+      debugPrint('💾 Saved vendor ID: $vendorId');
+    } catch (e) {
+      debugPrint('⚠️ Error saving vendor ID: $e');
+    }
+  }
+
+  /// Load vendor ID from persistent storage
+  Future<String?> _loadVendorId() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final vendorId = prefs.getString(_vendorIdKey);
+      debugPrint('📖 Loaded vendor ID from storage: $vendorId');
+      return vendorId;
+    } catch (e) {
+      debugPrint('⚠️ Error loading vendor ID: $e');
+      return null;
+    }
+  }
+
+  /// Clear saved vendor ID (e.g., on logout)
+  Future<void> clearSavedVendorId() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_vendorIdKey);
+      debugPrint('🗑️ Cleared saved vendor ID');
+    } catch (e) {
+      debugPrint('⚠️ Error clearing vendor ID: $e');
     }
   }
 }

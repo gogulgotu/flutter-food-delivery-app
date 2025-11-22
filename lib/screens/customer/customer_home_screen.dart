@@ -34,6 +34,14 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     // Load catalog data
     WidgetsBinding.instance.addPostFrameCallback((_) {
       try {
+        // Check authentication status
+        final authProvider = context.read<AuthProvider>();
+        debugPrint('🔐 Customer Home - Auth Status:');
+        debugPrint('   - Is Authenticated: ${authProvider.isAuthenticated}');
+        debugPrint('   - User: ${authProvider.user?.displayName ?? "None"}');
+        debugPrint('   - User Role: ${authProvider.user?.userRoleName ?? "None"}');
+        debugPrint('   - Phone: ${authProvider.user?.phoneNumber ?? "None"}');
+        
         context.read<CatalogProvider>().loadCatalog();
       } catch (e, stackTrace) {
         debugPrint('Error loading catalog: $e');
@@ -308,33 +316,51 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
             },
           ),
           const SizedBox(width: 12),
-          // Wallet Icon
-          Consumer<CustomerDashboardProvider>(
-            builder: (context, provider, _) {
-              return GestureDetector(
-                onTap: () {
-                  // TODO: Navigate to wallet
-                },
-                child: Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: AppTheme.bgLightGray,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Center(
-                    child: Text(
-                      '₹',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.primaryGreen,
-                      ),
-                    ),
-                  ),
+          // Wallet Icon (Coming Soon)
+          GestureDetector(
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Wallet feature coming soon!'),
+                  duration: Duration(seconds: 2),
                 ),
               );
             },
+            child: Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: AppTheme.bgLightGray.withOpacity(0.5),
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: Stack(
+                  children: [
+                    Icon(
+                      Icons.wallet_outlined,
+                      color: AppTheme.textMuted,
+                      size: 24,
+                    ),
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryGreen,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.construction,
+                          size: 10,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
           const SizedBox(width: 12),
           // Profile Icon

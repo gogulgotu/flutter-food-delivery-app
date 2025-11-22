@@ -31,6 +31,9 @@ class ApiService {
           final token = await StorageService().getAccessToken();
           if (token != null) {
             options.headers['Authorization'] = 'Bearer $token';
+            debugPrint('🔐 Token added to request: ${options.path}');
+          } else {
+            debugPrint('⚠️ No token found for request: ${options.path}');
           }
           return handler.next(options);
         },
@@ -385,37 +388,26 @@ class ApiService {
 
   /// Get wallet balance
   /// 
+  /// ⚠️ DISABLED: Wallet feature coming soon
   /// Returns wallet information with current balance
+  @Deprecated('Wallet feature is coming soon')
   Future<Map<String, dynamic>> getWalletBalance() async {
-    try {
-      final response = await _dio.get('${AppConfig.walletEndpoint}/');
-      return response.data as Map<String, dynamic>;
-    } on DioException catch (e) {
-      throw _handleError(e);
-    }
+    // Wallet feature is disabled - coming soon
+    throw Exception('Wallet feature is coming soon');
   }
 
   /// Get wallet transactions
   /// 
+  /// ⚠️ DISABLED: Wallet feature coming soon
   /// [page] - Page number for pagination
   /// [pageSize] - Number of items per page
+  @Deprecated('Wallet feature is coming soon')
   Future<Map<String, dynamic>> getWalletTransactions({
     int? page,
     int? pageSize,
   }) async {
-    try {
-      final queryParams = <String, dynamic>{};
-      if (page != null) queryParams['page'] = page;
-      if (pageSize != null) queryParams['page_size'] = pageSize;
-
-      final response = await _dio.get(
-        '${AppConfig.walletEndpoint}/transactions/',
-        queryParameters: queryParams.isEmpty ? null : queryParams,
-      );
-      return response.data as Map<String, dynamic>;
-    } on DioException catch (e) {
-      throw _handleError(e);
-    }
+    // Wallet feature is disabled - coming soon
+    throw Exception('Wallet feature is coming soon');
   }
 
   /// Get notifications
@@ -551,6 +543,344 @@ class ApiService {
       await _dio.delete('${AppConfig.cartEndpoint}/items/$itemId/delete/');
     } on DioException catch (e) {
       throw _handleError(e);
+    }
+  }
+
+  // ==================== Address Endpoints ====================
+
+  /// Get user's addresses
+  Future<List<dynamic>> getAddresses() async {
+    try {
+      final response = await _dio.get(AppConfig.addressesEndpoint);
+      final data = response.data;
+      // Handle both list and paginated responses
+      if (data is List) {
+        return data;
+      } else if (data is Map<String, dynamic>) {
+        if (data.containsKey('results')) {
+          return data['results'] as List;
+        } else if (data.containsKey('data')) {
+          return data['data'] as List;
+        }
+      }
+      return [];
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// Create a new address
+  Future<Map<String, dynamic>> createAddress(Map<String, dynamic> addressData) async {
+    try {
+      final response = await _dio.post(
+        AppConfig.addressesEndpoint,
+        data: addressData,
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// Update an existing address
+  Future<Map<String, dynamic>> updateAddress({
+    required int addressId,
+    required Map<String, dynamic> addressData,
+  }) async {
+    try {
+      final response = await _dio.patch(
+        '${AppConfig.addressesEndpoint}/$addressId/',
+        data: addressData,
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// Delete an address
+  Future<void> deleteAddress(int addressId) async {
+    try {
+      await _dio.delete('${AppConfig.addressesEndpoint}/$addressId/');
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  // ==================== Location Endpoints ====================
+
+  /// Geocode address (convert address to coordinates)
+  Future<Map<String, dynamic>> geocodeAddress(String address) async {
+    try {
+      final response = await _dio.post(
+        '/api/location/geocode/',
+        data: {'address': address},
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// Reverse geocode (convert coordinates to address)
+  Future<Map<String, dynamic>> reverseGeocode({
+    required double latitude,
+    required double longitude,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '/api/location/reverse-geocode/',
+        data: {
+          'latitude': latitude,
+          'longitude': longitude,
+        },
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  /// Save user location
+  Future<Map<String, dynamic>> saveLocation({
+    required double latitude,
+    required double longitude,
+    String? address,
+    double? accuracy,
+  }) async {
+    try {
+      final data = <String, dynamic>{
+        'latitude': latitude,
+        'longitude': longitude,
+      };
+      if (address != null) data['address'] = address;
+      if (accuracy != null) data['accuracy'] = accuracy;
+
+      final response = await _dio.post(
+        '/api/location/save/',
+        data: data,
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  // ==================== Order Endpoints ====================
+
+  /// Create a new order
+  /// 
+  /// ⚠️ Important: The endpoint URL must end with a trailing slash: /api/orders/
+  Future<Map<String, dynamic>> createOrder(Map<String, dynamic> orderData) async {
+    try {
+      debugPrint('📦 Creating order: ${AppConfig.ordersEndpoint}/');
+      debugPrint('📦 Order data: $orderData');
+      
+      final response = await _dio.post(
+        '${AppConfig.ordersEndpoint}/', // Ensure trailing slash
+        data: orderData,
+      );
+      
+      debugPrint('✅ Order created successfully: ${response.statusCode}');
+      debugPrint('✅ Order response: ${response.data}');
+      
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      // Log detailed error information
+      debugPrint('❌ DioException creating order:');
+      debugPrint('   Status code: ${e.response?.statusCode}');
+      debugPrint('   Response data: ${e.response?.data}');
+      debugPrint('   Response data type: ${e.response?.data.runtimeType}');
+      debugPrint('   Request path: ${e.requestOptions.path}');
+      debugPrint('   Request data: ${e.requestOptions.data}');
+      
+      // Handle different response data types
+      String? detailedError;
+      
+      if (e.response?.data is String) {
+        // Response is a plain string (often HTML error pages or plain text errors)
+        final errorString = e.response!.data as String;
+        debugPrint('   Error response is String (length: ${errorString.length})');
+        
+        // Log first 1000 chars for debugging (might be long HTML)
+        final preview = errorString.length > 1000 
+            ? '${errorString.substring(0, 1000)}...' 
+            : errorString;
+        debugPrint('   Error string preview:\n$preview');
+        
+        // Try to extract meaningful error from string
+        if (errorString.isNotEmpty) {
+          // If it's HTML, try to extract text content or title
+          if (errorString.contains('<body>') || errorString.contains('<html>') || errorString.contains('<!DOCTYPE')) {
+            // It's an HTML error page - try to extract title or error message
+            String? htmlError;
+            
+            // Try to extract title
+            final titleMatch = RegExp(r'<title>(.*?)</title>', caseSensitive: false).firstMatch(errorString);
+            if (titleMatch != null) {
+              htmlError = titleMatch.group(1)?.trim();
+            }
+            
+            // Try to extract h1 text
+            if (htmlError == null || htmlError.isEmpty) {
+              final h1Match = RegExp(r'<h1[^>]*>(.*?)</h1>', caseSensitive: false).firstMatch(errorString);
+              if (h1Match != null) {
+                htmlError = h1Match.group(1)?.replaceAll(RegExp(r'<[^>]+>'), '').trim();
+              }
+            }
+            
+            // Use extracted error or generic message
+            detailedError = htmlError?.isNotEmpty == true 
+                ? 'Server error: $htmlError'
+                : 'Server error (500). Please check the console logs for details.';
+            debugPrint('   ⚠️ HTML error page received from server');
+          } else {
+            // Plain text error - use it directly
+            detailedError = errorString.trim();
+          }
+        }
+      } else if (e.response?.data is Map<String, dynamic>) {
+        final errorData = e.response!.data as Map<String, dynamic>;
+        
+        // Log all error fields for debugging
+        debugPrint('   Error data keys: ${errorData.keys.toList()}');
+        errorData.forEach((key, value) {
+          debugPrint('   Error[$key]: $value (type: ${value.runtimeType})');
+        });
+        
+        if (errorData['requires_location'] == true) {
+          final customError = Exception('Location required. Please enable GPS and try again.');
+          (customError as dynamic).requiresLocation = true;
+          throw customError;
+        }
+        
+        // Extract detailed error messages from map
+        
+        // Try to extract error message from common fields
+        if (errorData.containsKey('error')) {
+          final errorValue = errorData['error'];
+          if (errorValue is String) {
+            detailedError = errorValue;
+          } else if (errorValue is List && errorValue.isNotEmpty) {
+            detailedError = errorValue.map((e) => e.toString()).join(', ');
+          } else {
+            detailedError = errorValue.toString();
+          }
+        } else if (errorData.containsKey('detail')) {
+          final detailValue = errorData['detail'];
+          if (detailValue is String) {
+            detailedError = detailValue;
+          } else if (detailValue is List && detailValue.isNotEmpty) {
+            detailedError = detailValue.map((e) => e.toString()).join(', ');
+          } else {
+            detailedError = detailValue.toString();
+          }
+        } else if (errorData.containsKey('message')) {
+          final messageValue = errorData['message'];
+          if (messageValue is String) {
+            detailedError = messageValue;
+          } else if (messageValue is List && messageValue.isNotEmpty) {
+            detailedError = messageValue.map((e) => e.toString()).join(', ');
+          } else {
+            detailedError = messageValue.toString();
+          }
+        } else if (errorData.containsKey('non_field_errors')) {
+          final nonFieldErrors = errorData['non_field_errors'];
+          if (nonFieldErrors is List && nonFieldErrors.isNotEmpty) {
+            detailedError = nonFieldErrors.map((e) => e.toString()).join(', ');
+          }
+        } else {
+          // Try to extract field-specific errors (Django REST Framework format)
+          final fieldErrors = <String>[];
+          errorData.forEach((key, value) {
+            if (value is List && value.isNotEmpty) {
+              final errorMessages = value.map((e) => e.toString()).join(', ');
+              fieldErrors.add('$key: $errorMessages');
+            } else if (value is Map) {
+              // Nested errors
+              value.forEach((nestedKey, nestedValue) {
+                if (nestedValue is List && nestedValue.isNotEmpty) {
+                  final nestedMessages = nestedValue.map((e) => e.toString()).join(', ');
+                  fieldErrors.add('$key.$nestedKey: $nestedMessages');
+                }
+              });
+            } else if (value is String && value.isNotEmpty) {
+              fieldErrors.add('$key: $value');
+            }
+          });
+          if (fieldErrors.isNotEmpty) {
+            detailedError = fieldErrors.join('; ');
+          }
+        }
+        
+        if (detailedError != null && detailedError.isNotEmpty) {
+          debugPrint('✅ Extracted detailed error: $detailedError');
+          throw Exception(detailedError);
+        }
+      }
+      
+      final error = _handleError(e);
+      debugPrint('❌ Error creating order (fallback): $error');
+      throw Exception(error);
+    }
+  }
+
+  /// Get order details
+  Future<Map<String, dynamic>> getOrder(String orderId) async {
+    try {
+      final response = await _dio.get('${AppConfig.ordersEndpoint}/$orderId/');
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  // ==================== Payment Endpoints ====================
+
+  /// Create Paytm payment order
+  Future<Map<String, dynamic>> createPaytmOrder(String orderId) async {
+    try {
+      debugPrint('💳 Creating Paytm order for: $orderId');
+      final response = await _dio.post(
+        '${AppConfig.paymentsEndpoint}/paytm/create-order/',
+        data: {'order_id': orderId},
+      );
+      debugPrint('✅ Paytm order created: ${response.statusCode}');
+      debugPrint('✅ Paytm response: ${response.data}');
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      final error = _handleError(e);
+      debugPrint('❌ Error creating Paytm order: $error');
+      throw error;
+    }
+  }
+
+  /// Verify Paytm payment
+  /// Payment data should be form data from Paytm callback
+  Future<Map<String, dynamic>> verifyPaytmPayment(Map<String, dynamic> paymentData) async {
+    try {
+      debugPrint('🔍 Verifying Paytm payment: $paymentData');
+      
+      // Convert to form data for Paytm callback
+      final formData = FormData.fromMap(
+        paymentData.map((key, value) => MapEntry(key, value.toString())),
+      );
+      
+      final response = await _dio.post(
+        '${AppConfig.paymentsEndpoint}/paytm/verify/',
+        data: formData,
+        options: Options(
+          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        ),
+      );
+      
+      debugPrint('✅ Payment verified: ${response.statusCode}');
+      debugPrint('✅ Verification response: ${response.data}');
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      final error = _handleError(e);
+      debugPrint('❌ Error verifying Paytm payment: $error');
+      throw error;
     }
   }
 
